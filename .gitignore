@@ -1,0 +1,10 @@
+__pycache__/
+.DS_Store
+*.pyc
+*.pyo
+swarm_test_environment/*/.hermes/
+swarm_test_environment/*/*.db
+swarm_test_environment/*/*.db-shm
+swarm_test_environment/*/*.db-wal
+swarm_test_environment/monitoring.db
+/tmp/

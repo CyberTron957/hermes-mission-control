@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Swarm Monitor</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+    --bg: #0d1117;
+    --bg-raised: #161b22;
+    --bg-card: #1c2128;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --idle: #3fb950;
+    --busy: #f59e0b;
+    --human: #58a6ff;
+    --danger: #f85149;
+    --tool: #d2a8ff;
+    --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+.topbar {
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.logo { font-size: 16px; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+.logo::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--idle); animation: pulse-dot 2s infinite; }
+@keyframes pulse-dot { 0%, 100% { box-shadow: 0 0 0 0 rgba(63,185,80,0.4); } 50% { box-shadow: 0 0 0 8px rgba(63,185,80,0); } }
+.topbar-stats { display: flex; gap: 18px; font-size: 12px; color: var(--text-muted); }
+.stat-badge { background: var(--bg-card); padding: 1px 7px; border-radius: 10px; font-weight: 600; color: var(--text); border: 1px solid var(--border); }
+.ws-status { display: flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 10px; border-radius: 5px; background: var(--bg-card); border: 1px solid var(--border); }
+.ws-status.connected { border-color: var(--idle); color: var(--idle); }
+.ws-status.disconnected { border-color: var(--danger); color: var(--danger); }
+.ws-status.connecting { border-color: var(--busy); color: var(--busy); }
+.ws-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.container { display: grid; grid-template-columns: 260px 1fr 360px; grid-template-rows: 1fr auto; gap: 1px; background: var(--border); min-height: calc(100vh - 47px); }
+.panel { background: var(--bg); overflow: hidden; display: flex; flex-direction: column; }
+.panel-header { background: var(--bg-raised); padding: 10px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.panel-body { flex: 1; overflow-y: auto; padding: 10px; }
+.agent-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 11px; margin-bottom: 8px; transition: all 0.25s; cursor: pointer; position: relative; }
+.agent-card:hover { border-color: var(--accent); transform: translateX(3px); }
+.agent-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(88,166,255,0.12); }
+.agent-card.idle { border-left: 3px solid var(--idle); }
+.agent-card.busy { border-left: 3px solid var(--busy); }
+.agent-card.asking_human { border-left: 3px solid var(--human); }
+.agent-name { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 7px; }
+.status-dot { width: 9px; height: 9px; border-radius: 50%; position: relative; }
+.status-dot.idle { background: var(--idle); }
+.status-dot.busy { background: var(--busy); animation: busy-blink 1.4s infinite; }
+.status-dot.asking_human { background: var(--human); animation: busy-blink 1.8s infinite; }
+@keyframes busy-blink { 0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0.5);} 50%{box-shadow:0 0 0 8px rgba(245,158,11,0);} }
+.agent-meta { display: flex; gap: 10px; font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+.queue-badge { background: var(--bg); padding: 1px 7px; border-radius: 10px; font-weight: 600; font-size: 10px; color: var(--accent); border: 1px solid var(--border); }
+.queue-badge.pop { animation: pop-badge 0.4s ease-out; }
+@keyframes pop-badge { 50%{ transform: scale(1.3); background: var(--accent); color: white; } }
+.network-container { position: relative; height: 320px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); margin-bottom: 10px; overflow: hidden; }
+.network-title { position: absolute; top: 10px; left: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); z-index: 10; pointer-events: none; }
+#network-svg { width: 100%; height: 100%; }
+.queue-viz { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.queue-bar-row { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+.queue-bar-label { width: 80px; font-size: 11px; color: var(--text-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.queue-bar-track { flex: 1; height: 18px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.queue-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.5s; }
+.queue-bar-count { width: 24px; text-align: right; font-size: 12px; font-weight: 600; }
+.message-list { display: flex; flex-direction: column; gap: 6px; }
+.msg-block { background: var(--bg-card); border: 1px solid var(--border); border-radius: 7px; overflow: hidden; animation: slideIn 0.25s ease-out; }
+@keyframes slideIn { from { opacity:0; transform: translateX(8px); } }
+.msg-header { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; user-select: none; font-size: 11px; transition: background 0.15s; }
+.msg-header:hover { background: rgba(255,255,255,0.03); }
+.msg-role-badge { padding: 1px 6px; border-radius: 3px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.msg-role-badge.user { background: rgba(88,166,255,0.12); color: var(--accent); }
+.msg-role-badge.assistant { background: rgba(63,185,80,0.12); color: var(--idle); }
+.msg-role-badge.system { background: rgba(139,148,158,0.1); color: var(--text-muted); }
+.msg-role-badge.tool { background: rgba(210,168,255,0.12); color: var(--tool); }
+.msg-time { margin-left: auto; font-size: 10px; color: var(--text-muted); }
+.msg-body { padding: 8px 12px 10px; font-size: 12px; line-height: 1.5; color: var(--text); word-break: break-word; border-top: 1px solid var(--border); }
+.msg-body.collapsed { display: none; }
+.msg-body pre { background: var(--bg); padding: 8px; border-radius: 4px; overflow-x: auto; font-size: 11px; font-family: var(--font-mono); margin-top: 6px; white-space: pre-wrap; }
+.msg-body .tool-call { background: rgba(210,168,255,0.07); border-left: 2px solid var(--tool); padding: 6px 10px; margin: 6px 0; border-radius: 0 4px 4px 0; font-family: var(--font-mono); font-size: 11px; }
+.event-log-container { grid-column: 1/-1; background: var(--bg); border-top: 1px solid var(--border); max-height: 220px; min-height: 100px; display: flex; flex-direction: column; }
+.event-log-container.collapsed { max-height: 36px; min-height: 36px; }
+.event-log-header { background: var(--bg-raised); padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+.event-log-header h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.event-log-header .toggle { font-size: 13px; color: var(--text-muted); transition: transform 0.3s; }
+.event-log-container.collapsed .toggle { transform: rotate(-90deg); }
+.event-log-body { flex: 1; overflow-y: auto; padding: 6px 14px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; }
+.event-line { display: flex; gap: 7px; padding: 1px 0; border-left: 2px solid transparent; padding-left: 5px; }
+.event-line:hover { background: rgba(255,255,255,0.02); }
+.event-line.state_change { border-left-color: var(--accent); }
+.event-line.task_enqueued { border-left-color: var(--idle); }
+.event-line.task_dequeued { border-left-color: var(--accent); }
+.event-line.message_sent { border-left-color: var(--busy); }
+.event-line.conversation_complete { border-left-color: var(--idle); }
+.event-line.error { border-left-color: var(--danger); }
+.event-line.human_waiting { border-left-color: var(--human); }
+.ev-tag { min-width: 90px; flex-shrink: 0; font-weight: 600; font-size: 10px; opacity: 0.8; }
+.ev-time { color: var(--text-muted); min-width: 55px; flex-shrink: 0; }
+.ev-desc { word-break: break-word; opacity: 0.9; }
+.controls-section { border-top: 1px solid var(--border); padding: 10px; background: var(--bg); flex-shrink: 0; }
+.controls-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+.control-group { margin-bottom: 8px; }
+.control-label { font-size: 10px; color: var(--text-muted); margin-bottom: 3px; display: block; }
+.control-input, .control-select, .control-textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 6px 9px; color: var(--text); font-size: 11px; font-family: inherit; transition: border-color 0.2s; }
+.control-input:focus, .control-select:focus, .control-textarea:focus { outline: none; border-color: var(--accent); }
+.control-textarea { min-height: 50px; resize: vertical; }
+.btn { background: var(--accent); color: white; border: none; border-radius: 5px; padding: 7px 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; width: 100%; }
+.btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-secondary:hover { border-color: var(--accent); }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 16px; color: var(--text-muted); font-size: 12px; text-align: center; }
+.empty-state-icon { font-size: 26px; margin-bottom: 8px; opacity: 0.4; }
+@media (max-width: 1100px) { .container { grid-template-columns: 220px 1fr 300px; } }
+@media (max-width: 800px) { .container { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; } }
+</style>
+</head>
+<body>
+<div class="topbar">
+    <div class="topbar-stats">
+        <span class="logo">Hermes Swarm</span>
+        <span>Agents <span class="stat-badge" id="stat-agents">0</span></span>
+        <span>Busy <span class="stat-badge" id="stat-busy">0</span></span>
+        <span>Queued <span class="stat-badge" id="stat-queued">0</span></span>
+        <span>Events <span class="stat-badge" id="stat-events">0</span></span>
+    </div>
+    <div class="ws-status disconnected" id="ws-status"><span class="ws-dot"></span><span id="ws-text">Disconnected</span></div>
+</div>
+
+<div class="container">
+    <div class="panel"><div class="panel-header">Agents <span style="font-size:10px;color:var(--text-muted)">Click to inspect</span></div><div class="panel-body" id="agent-list"><div class="empty-state"><div class="empty-state-icon">🔍</div><div>Waiting...</div></div></div></div>
+    <div class="panel"><div class="panel-header">Network <span style="font-size:10px;color:var(--text-muted)" id="net-info">No data</span></div><div class="panel-body">
+        <div class="network-container"><div class="network-title">Live Network</div><svg id="network-svg" viewBox="0 0 580 300"></svg></div>
+        <div class="queue-viz"><div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span class="controls-title" style="margin:0">Task Queues</span><span style="font-size:10px;color:var(--text-muted)" id="sweep-timer">Next sweep in 10s</span></div><div class="queue-bars" id="queue-bars"></div></div>
+    </div></div>
+    <div class="panel" style="display:flex;flex-direction:column"><div class="panel-header"><span id="msg-header">Messages</span><span style="font-size:10px;color:var(--text-muted)" id="msg-count">0</span></div><div class="panel-body" id="message-list" style="flex:1;overflow-y:auto"><div class="empty-state"><div class="empty-state-icon">💬</div><div>Select an agent</div></div></div>
+        <div class="controls-section">
+            <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Manual Controls</div>
+            <div style="margin-bottom:6px"><select class="control-input" id="ctrl-target"></select></div>
+            <div style="margin-bottom:6px"><textarea class="control-textarea" id="ctrl-payload" placeholder="Message or task..." style="min-height:40px"></textarea></div>
+            <button class="btn" onclick="sendTask()">Send Task</button>
+            <div style="margin-top:5px;display:flex;gap:5px"><button class="btn btn-secondary" style="flex:1" onclick="refreshData()">Refresh</button><button class="btn btn-secondary" style="flex:1" onclick="clearLog()">Clear</button></div>
+        </div>
+    </div>
+    <div class="event-log-container" id="event-log">
+        <div class="event-log-header" onclick="toggleLog()"><h3>🖥️ Event Log</h3><span class="toggle" id="log-toggle">▼</span></div>
+        <div class="event-log-body" id="event-log-body"></div>
+    </div>
+</div>
+
+
+
+<script>
+const WS_URL = `ws://${window.location.host}/ws`;
+const API_URL = `${window.location.protocol}//${window.location.host}`;
+
+let ws = null, reconnectTimer = null, reconnectDelay = 1000;
+let agentData = {}, selectedAgent = null, eventCount = 0, msgCount = 0;
+
+function setWsStatus(status, text) {
+    const el = document.getElementById('ws-status');
+    document.getElementById('ws-text').textContent = text;
+    el.className = 'ws-status ' + status;
+}
+
+function connectWS() {
+    if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
+    setWsStatus('connecting', 'Connecting...');
+    ws = new WebSocket(WS_URL);
+    ws.onopen = () => { setWsStatus('connected', 'Live'); reconnectDelay = 1000; logEvent('system', 'Connected'); refreshData(); };
+    ws.onmessage = (e) => { try { handleWS(JSON.parse(e.data)); } catch(err) {} };
+    ws.onclose = () => { setWsStatus('disconnected', 'Disconnected'); logEvent('system', 'WS closed — reconnecting...'); scheduleReconnect(); };
+    ws.onerror = () => { setWsStatus('disconnected', 'Error'); };
+}
+
+function scheduleReconnect() {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => { reconnectDelay = Math.min(reconnectDelay * 1.5, 10000); connectWS(); }, reconnectDelay);
+}
+
+function handleWS(msg) {
+    const { type, payload } = msg;
+    switch (type) {
+        case 'state_snapshot': agentData = payload.agents || {}; renderAgents(); renderNetwork(); renderQueues(); updateStats(); updateTarget(); updateSweepTimer(); break;
+        case 'state_change': if (agentData[payload.agent_name]) { agentData[payload.agent_name].state = payload.state; if (payload.next_sweep_at) agentData[payload.agent_name].next_sweep_at = payload.next_sweep_at; } renderAgents(); renderNetwork(); updateStats(); logEvent('state_change', `${payload.agent_name} → ${payload.state}`); updateSweepTimer(); break;
+        case 'task_enqueued': case 'queue_updated':
+            if (agentData[payload.agent_name]) agentData[payload.agent_name].pending_count = payload.pending_count;
+            renderAgents(); renderQueues(); updateStats(); if (type === 'task_enqueued') logEvent('task_enqueued', `${payload.from_agent || 'unknown'} → ${payload.agent_name}`); break;
+        case 'task_dequeued': logEvent('task_dequeued', `${payload.agent_name} processing ${payload.count}`); renderQueues(); break;
+        case 'message_sent': logEvent('message_sent', `${payload.from_agent} → ${payload.to_agent}`); animateParticle(payload.from_agent, payload.to_agent); break;
+        case 'conversation_start': logEvent('conversation_start', `${payload.agent_name} processing from ${payload.from_agent}`); break;
+        case 'conversation_complete': logEvent('conversation_complete', `${payload.agent_name} done`); if (selectedAgent === payload.agent_name) loadMessages(payload.agent_name); break;
+        case 'message_logged': if (selectedAgent === payload.agent_name) { addMessageToUI(payload); } msgCount++; document.getElementById('msg-count').textContent = msgCount; break;
+        case 'human_waiting': logEvent('human_waiting', `${payload.agent_name}: "${payload.question?.slice(0, 50)}..."`); break;
+        case 'human_responded': logEvent('human_responded', `${payload.agent_name} received response`); break;
+        case 'error': logEvent('error', `${payload.agent_name}: ${payload.error?.slice(0, 100)}`); break;
+        case 'soul_updated': logEvent('system', `${payload.agent_name} soul updated`); break;
+    }
+}
+
+/* ===== RENDERERS ===== */
+function renderAgents() {
+    const names = Object.keys(agentData).sort();
+    const el = document.getElementById('agent-list');
+    if (!names.length) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div>Waiting...</div></div>'; return; }
+    el.innerHTML = names.map(n => {
+        const a = agentData[n]; const st = a.state || 'idle'; const sel = selectedAgent === n;
+        return `<div class="agent-card ${st} ${sel?'selected':''}" onclick="selectAgent('${n}')">
+            <div class="agent-name"><span class="status-dot ${st}"></span>${esc(a.config?.name || n)}</div>
+            <div class="agent-meta"><span>Queue: <span class="queue-badge">${a.pending_count || 0}</span></span><span style="font-family:var(--font-mono);font-size:10px">${a.config?.session_id?.slice(0,14)}...</span></div>
+        </div>`;
+    }).join('');
+}
+
+function renderNetwork() {
+    const svg = document.getElementById('network-svg');
+    const names = Object.keys(agentData).sort();
+    if (!names.length) return;
+    const w = 580, h = 300, cx = w/2, cy = h/2, r = Math.min(w,h)/2 - 50;
+    const pos = {};
+    names.forEach((n, i) => { const a = (i/names.length)*2*Math.PI - Math.PI/2; pos[n] = {x: cx+r*Math.cos(a), y: cy+r*Math.sin(a)}; });
+    let html = '';
+    for (let i=0;i<names.length;i++) for(let j=i+1;j<names.length;j++) { const a=pos[names[i]], b=pos[names[j]]; html += `<line class="conn" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#30363d" stroke-width="2"/>`; }
+    names.forEach(n => {
+        const p = pos[n], st = agentData[n]?.state || 'idle';
+        const col = st==='idle'?'#3fb950':st==='busy'?'#f59e0b':'#58a6ff';
+        html += `<g onclick="selectAgent('${n}')" style="cursor:pointer"><circle cx="${p.x}" cy="${p.y}" r="26" fill="${col}18" stroke="${col}" stroke-width="2"/>
+            <circle cx="${p.x}" cy="${p.y}" r="5" fill="${col}">${st==='busy'?'<animate attributeName="r" values="5;9;5" dur="1.4s" repeatCount="indefinite"/>':''}</circle>
+            <text x="${p.x}" y="${p.y+40}" text-anchor="middle" fill="#c9d1d9" font-size="11" font-weight="600">${esc(agentData[n]?.config?.name || n)}</text>
+            <text x="${p.x}" y="${p.y+54}" text-anchor="middle" fill="#8b949e" font-size="10">Q:${agentData[n]?.pending_count||0}</text></g>`;
+    });
+    svg.innerHTML = html;
+    document.getElementById('net-info').textContent = `${names.length} agents`;
+}
+
+function animateParticle(fromAgent, toAgent) {
+    const svg = document.getElementById('network-svg');
+    const nodes = Array.from(svg.querySelectorAll('g'));
+    const fromG = nodes.find(g => g.getAttribute('onclick')?.includes(`'${fromAgent}'`));
+    const toG = nodes.find(g => g.getAttribute('onclick')?.includes(`'${toAgent}'`));
+    if (!fromG || !toG) return;
+    const c1 = fromG.querySelector('circle'), c2 = toG.querySelector('circle');
+    const x1 = +c1.getAttribute('cx'), y1 = +c1.getAttribute('cy');
+    const x2 = +c2.getAttribute('cx'), y2 = +c2.getAttribute('cy');
+    const p = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    p.setAttribute('r','4'); p.setAttribute('fill','#58a6ff'); p.setAttribute('filter','drop-shadow(0 0 4px #58a6ff)');
+    svg.appendChild(p);
+    const t0 = performance.now(), dur = 700;
+    function step(t) {
+        const k = Math.min((t-t0)/dur, 1), e = 1-Math.pow(1-k,3);
+        p.setAttribute('cx', x1+(x2-x1)*e); p.setAttribute('cy', y1+(y2-y1)*e);
+        if (k<1) requestAnimationFrame(step); else p.remove();
+    }
+    requestAnimationFrame(step);
+    svg.querySelectorAll('line').forEach(line => {
+        const lx1=+line.getAttribute('x1'), ly1=+line.getAttribute('y1'), lx2=+line.getAttribute('x2'), ly2=+line.getAttribute('y2');
+        if ((Math.abs(lx1-x1)<2&&Math.abs(ly1-y1)<2&&Math.abs(lx2-x2)<2&&Math.abs(ly2-y2)<2) || (Math.abs(lx1-x2)<2&&Math.abs(ly1-y2)<2&&Math.abs(lx2-x1)<2&&Math.abs(ly2-y1)<2)) {
+            line.setAttribute('stroke','#58a6ff'); setTimeout(() => line.setAttribute('stroke','#30363d'), 800);
+        }
+    });
+}
+
+function renderQueues() {
+    const el = document.getElementById('queue-bars');
+    const names = Object.keys(agentData).sort();
+    if (!names.length) { el.innerHTML = '<div class="empty-state" style="padding:16px"><div class="empty-state-icon">📊</div><div>No data</div></div>'; return; }
+    const max = Math.max(1, ...names.map(n => agentData[n]?.pending_count || 0));
+    el.innerHTML = names.map(n => {
+        const a = agentData[n] || {};
+        const q = a.pending_count || 0, pct = (q/max)*100;
+        const color = q>0 ? 'var(--accent)' : 'var(--idle)';
+        let timerText = "";
+        if (a.next_sweep_at) {
+            const remaining = Math.max(0, Math.round(a.next_sweep_at - Date.now() / 1000));
+            if (a.state === 'busy' || remaining <= 0) timerText = "sweeping now";
+            else timerText = `${remaining}s`;
+        }
+        return `<div class="queue-bar-row"><div class="queue-bar-label">${esc(n)}</div><div class="queue-bar-track"><div class="queue-bar-fill" style="width:${pct}%;background:${color}"></div></div><div style="font-size:10px;color:var(--text-muted);min-width:22px;text-align:right">${timerText}</div><div class="queue-bar-count">${q}</div></div>`;
+    }).join('');
+}
+
+function addMessageToUI(msg) {
+    const container = document.getElementById('message-list');
+    if (container.querySelector('.empty-state')) container.innerHTML = '';
+    const role = msg.role || 'unknown';
+    const time = new Date().toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    const isToolCall = msg.tool_calls && msg.tool_calls.length;
+    const block = document.createElement('div');
+    block.className = 'msg-block';
+    block.innerHTML = `
+        <div class="msg-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+            <span class="msg-role-badge ${role}">${role}</span>
+            <span style="font-size:10px;color:var(--text-muted)">${esc(msg.task_id?.slice(0,8) || '')}</span>
+            ${isToolCall ? '<span style="font-size:10px;color:var(--tool);margin-left:4px">🔧 tools</span>' : ''}
+            <span class="msg-time">${time}</span>
+        </div>
+        <div class="msg-body">${formatMessageContent(msg)}</div>
+    `;
+    container.appendChild(block);
+    container.scrollTop = container.scrollHeight;
+}
+
+function formatMessageContent(msg) {
+    let text = esc(msg.content || '');
+    // If it looks like a tool result or tool call, format it nicely
+    if (text.startsWith('🛠️ Tool Calls:') || text.startsWith('📤 Tool Result')) {
+        return `<pre>${text}</pre>`;
+    }
+    if (msg.tool_calls) {
+        let html = '';
+        msg.tool_calls.forEach(tc => {
+            const fn = tc.function || {};
+            html += `<div class="tool-call"><strong>${esc(fn.name || '?')}</strong><pre>${esc(fn.arguments || '{}')}</pre></div>`;
+        });
+        return html + (text ? `<div style="margin-top:6px">${text}</div>` : '');
+    }
+    return text ? text.replace(/\n/g, '<br>') : '<em style="color:var(--text-muted)">(no text content)</em>';
+}
+
+/* ===== MESSAGE PANEL ===== */
+async function loadMessages(agentName) {
+    try {
+        const res = await fetch(`${API_URL}/monitoring/agents/${agentName}/messages?limit=100`);
+        const data = await res.json();
+        const container = document.getElementById('message-list');
+        document.getElementById('msg-header').textContent = `Messages: ${agentName}`;
+        if (!data.messages || !data.messages.length) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💬</div><div>No messages</div></div>';
+            document.getElementById('msg-count').textContent = '0';
+            return;
+        }
+        container.innerHTML = '';
+        msgCount = data.messages.length;
+        document.getElementById('msg-count').textContent = msgCount;
+        data.messages.forEach(m => {
+            const div = document.createElement('div');
+            div.className = 'msg-block';
+            const role = m.role || 'unknown';
+            const ts = m.timestamp ? new Date(m.timestamp * 1000).toLocaleTimeString([], {hour12:false}) : '';
+            const hasToolCall = (m.content || '').startsWith('🛠️ Tool Calls:');
+            div.innerHTML = `
+                <div class="msg-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+                    <span class="msg-role-badge ${role}">${role}</span>
+                    <span style="font-size:10px;color:var(--text-muted)">${esc(m.task_id?.slice(0,8)||'')}</span>
+                    ${hasToolCall ? '<span style="font-size:10px;color:var(--tool);margin-left:4px">🔧 tools</span>' : ''}
+                    <span class="msg-time">${ts}</span>
+                </div>
+                <div class="msg-body collapsed">${formatMessageContent(m)}</div>
+            `;
+            container.appendChild(div);
+        });
+        container.scrollTop = container.scrollHeight;
+    } catch (e) { console.error(e); }
+}
+
+/* ===== EVENT LOG ===== */
+function logEvent(type, message) {
+    eventCount++;
+    const container = document.getElementById('event-log-body');
+    const time = new Date().toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    const line = document.createElement('div');
+    line.className = `event-line ${type}`;
+    line.innerHTML = `<span class="ev-time">${time}</span><span class="ev-tag" style="color:var(--${type==='state_change'?'accent':type==='task_enqueued'?'idle':type==='message_sent'?'busy':type==='error'?'danger':type==='human_waiting'?'human':'text-muted'})">${type}</span><span class="ev-desc">${esc(message)}</span>`;
+    container.insertBefore(line, container.firstChild);
+    while (container.children.length > 150) container.removeChild(container.lastChild);
+    updateStats();
+}
+
+function toggleLog() { document.getElementById('event-log').classList.toggle('collapsed'); }
+function clearLog() { document.getElementById('event-log-body').innerHTML = ''; eventCount = 0; updateStats(); }
+
+/* ===== STATS & INTERACTION ===== */
+function updateStats() {
+    const names = Object.keys(agentData);
+    document.getElementById('stat-agents').textContent = names.length;
+    document.getElementById('stat-busy').textContent = names.filter(n => agentData[n]?.state === 'busy').length;
+    document.getElementById('stat-queued').textContent = names.reduce((s, n) => s + (agentData[n]?.pending_count || 0), 0);
+    document.getElementById('stat-events').textContent = eventCount;
+}
+
+function selectAgent(name) {
+    selectedAgent = name;
+    renderAgents();
+    if (name) loadMessages(name);
+}
+
+function updateTarget() {
+    const s = document.getElementById('ctrl-target');
+    s.innerHTML = Object.keys(agentData).sort().map(n => `<option value="${n}">${n}</option>`).join('');
+}
+
+async function refreshData() {
+    try {
+        const res = await fetch(`${API_URL}/monitoring/agents`);
+        const data = await res.json();
+        if (data.agents) { Object.assign(agentData, data.agents); renderAgents(); renderNetwork(); renderQueues(); updateStats(); updateTarget(); updateSweepTimer(); }
+    } catch (e) { console.error(e); }
+}
+
+async function sendTask() {
+    const target = document.getElementById('ctrl-target').value;
+    const payload = document.getElementById('ctrl-payload').value.trim();
+    if (!target || !payload) return;
+    try {
+        const res = await fetch(`${API_URL}/agent/${target}/task`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({from_agent:'human_operator', payload}) });
+        const data = await res.json();
+        if (data.error) logEvent('error', `Send failed: ${data.error}`);
+        else { logEvent('task_enqueued', `Manual → ${target}`); document.getElementById('ctrl-payload').value = ''; }
+    } catch (e) { logEvent('error', `Send failed: ${e.message}`); }
+}
+
+function esc(s) {
+    if (!s) return '';
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+}
+
+/* ===== SWEEP TIMER ===== */
+function updateSweepTimer() {
+    const el = document.getElementById('sweep-timer');
+    if (!el) return;
+    const names = Object.keys(agentData);
+    if (!names.length) { el.textContent = 'No agents'; return; }
+    let next = Infinity;
+    for (const n of names) {
+        const t = agentData[n]?.next_sweep_at;
+        if (t && t < next) next = t;
+    }
+    if (!isFinite(next)) { el.textContent = 'Next sweep in ?s'; return; }
+    const remaining = Math.max(0, Math.round(next - Date.now() / 1000));
+    el.textContent = `Next sweep in ${remaining}s`;
+    renderQueues(); // refresh per-agent timers
+}
+setInterval(updateSweepTimer, 500);
+
+document.addEventListener('DOMContentLoaded', () => { connectWS(); refreshData(); });
+</script>
+</body>
+</html>

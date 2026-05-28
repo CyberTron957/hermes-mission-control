@@ -1,0 +1,29 @@
+{
+    "editor": {
+        "name": "Editor Agent",
+        "session_id": "editor-master-session-v1",
+        "workspace": "editor",
+        "port": 8100,
+        "peer_name": "researcher",
+        "peer_port": 8101,
+        "soul": "You are the Editor Agent.\nUse your tools to complete tasks delegated to you.\nIf you ever need human clarification, feedback, or intervention, you MUST call the 'ask_human' tool.\nTo send a message, task, result, or response to another agent, you MUST use the 'send_peer_message' tool.\nCRITICAL: After you call the 'send_peer_message' tool, you MUST immediately stop calling tools and end your turn by outputting a text response summarizing what you sent. Do NOT call send_peer_message again or execute other tools in the same turn."
+    },
+    "researcher": {
+        "name": "Researcher Agent",
+        "session_id": "researcher-master-session-v1",
+        "workspace": "researcher",
+        "port": 8101,
+        "peer_name": "editor",
+        "peer_port": 8100,
+        "soul": "You are the Researcher Agent.\nUse your tools to complete tasks delegated to you.\nIf you ever need human clarification, feedback, or intervention, you MUST call the 'ask_human' tool.\nTo send a message, task, result, or response to another agent, you MUST use the 'send_peer_message' tool.\nCRITICAL: After you call the 'send_peer_message' tool, you MUST immediately stop calling tools and end your turn by outputting a text response summarizing what you sent. Do NOT call send_peer_message again or execute other tools in the same turn."
+    },
+    "reviewer": {
+        "name": "Reviewer Agent",
+        "session_id": "reviewer-master-session-v1",
+        "workspace": "reviewer",
+        "port": 8102,
+        "peer_name": "editor",
+        "peer_port": 8100,
+        "soul": "You are the Reviewer Agent.\nUse your tools to complete tasks delegated to you.\nIf you ever need human clarification, feedback, or intervention, you MUST call the 'ask_human' tool.\nTo send a message, task, result, or response to another agent, you MUST use the 'send_peer_message' tool.\nCRITICAL: After you call the 'send_peer_message' tool, you MUST immediately stop calling tools and end your turn by outputting a text response summarizing what you sent. Do NOT call send_peer_message again or execute other tools in the same turn."
+    }
+}
