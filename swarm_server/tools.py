@@ -110,10 +110,18 @@ def _ask_human_handler(args: dict, **kwargs) -> str:
 
     daemon.human_event.clear()
     daemon.human_response = None
-    daemon.human_event.wait()
+    daemon.human_event.wait(timeout=60)  # safety: never deadlock forever
 
     with daemon._lock:
         daemon.state = "busy"
+
+    if not daemon.human_event.is_set():
+        log.warning("[%s] [ask_human] Timeout — no human response in 60s", daemon.name)
+        daemon.state = "idle"
+        return json.dumps({
+            "success": False,
+            "error": "No human responded within 60 seconds. Proceed with your best judgment or retry later.",
+        })
 
     log.info("[%s] [ask_human] Response received: %s", daemon.name, daemon.human_response)
     monitor_db.log_event(caller, "human_responded", data={"question": question, "response": daemon.human_response})
