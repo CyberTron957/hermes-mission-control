@@ -33,6 +33,7 @@ from swarm_server.prompts import (
     AUTONOMOUS_HEARTBEAT_PROMPT,
     CRON_WAKEUP_PROMPT,
     SUPERVISOR_FEED_PROMPT,
+    TEXT_ONLY_TURN_NUDGE,
     compose_agent_soul,
     compose_live_context,
     compose_soul_identity,
@@ -121,6 +122,9 @@ class AgentDaemon:
         # Static half of the ephemeral system prompt; set in _ensure_agent and
         # combined with per-turn live context before each run.
         self._base_ephemeral: Optional[str] = None
+        # Guard so the "you ended in the chat" corrective fires at most once per
+        # occurrence (never loops): set when nudged, cleared when a turn delivers.
+        self._text_only_nudged: bool = False
         self._sweep_task: Optional[asyncio.Task] = None
         # Event-driven wake: ingest_task signals this so the sweep loop processes
         # immediately instead of waiting out the poll interval. Created in
@@ -353,6 +357,7 @@ class AgentDaemon:
                     self._hermes_home, cdp_url=cdp_url, model=model,
                     compression_threshold=compression_threshold,
                     provider=eff["provider"], base_url=eff["base_url"], api_key=eff["api_key"],
+                    is_supervisor=bool(self.cfg.get("is_supervisor")),
                 )
 
                 # CRITICAL: bind the session DB to THIS agent's home explicitly.
@@ -968,6 +973,20 @@ class AgentDaemon:
         "request_config_change", "schedule_wakeup", "cancel_wakeup",
     }
 
+    # Purely READ-ONLY tools. Every turn ends with a stop-reason text message (the
+    # API guarantees that), so "ended with text" is NOT a useful signal. What
+    # matters is whether the turn DID anything besides look around. The text-only
+    # turn guard fires only when a turn's tool calls were ALL read-only (or there
+    # were none) and it then wrote a prose summary — i.e. it investigated/mused and
+    # narrated instead of acting. Anything NOT in this set (terminal, code, write,
+    # patch, send_peer_message, log_decision, browser_*, deploy, …) counts as
+    # acting, so a real deploy-via-terminal turn is never falsely nudged.
+    _READONLY_TOOLS = {
+        "read_file", "search_files", "web_search", "web_extract",
+        "get_self_config", "list_files", "list_dir", "grep", "glob", "ls",
+        "todo", "memory", "get_messages",
+    }
+
     @staticmethod
     def _norm_msg(text: str) -> str:
         """Normalize an assistant message to its intent so near-duplicate status
@@ -1562,6 +1581,39 @@ class AgentDaemon:
             })
             for t in tasks:
                 self.queue.mark_done(t["id"])
+
+            # --- Text-only turn guard ----------------------------------------
+            # Every turn ends with a stop-reason text message (API guarantee), so
+            # that alone is not a fault. Fire ONLY when the turn ACTED on nothing:
+            # its tool calls (if any) were all read-only, then it wrote a summary —
+            # i.e. it investigated/mused and narrated instead of doing/delegating.
+            # A turn that ran terminal, wrote a file, sent a peer message, logged a
+            # decision, etc. counts as acting and is left alone (no false nudge on
+            # a real deploy). Capped at one nudge per occurrence via
+            # _text_only_nudged so it can never loop; cleared once a turn acts.
+            # Skipped for supervisors (their feed prompt governs them) and on stop.
+            try:
+                assts = [m for m in turn_messages if m.get("role") == "assistant"]
+                tool_names = [
+                    tc.get("function", {}).get("name")
+                    for m in assts for tc in (m.get("tool_calls") or [])
+                ]
+                acted = any(n and n not in self._READONLY_TOOLS for n in tool_names)
+                wrote_summary = (
+                    bool(assts)
+                    and not assts[-1].get("tool_calls")
+                    and len((assts[-1].get("content") or "").strip()) > 40
+                )
+                if acted:
+                    self._text_only_nudged = False
+                elif (wrote_summary and not self._text_only_nudged
+                      and not self._stop_requested
+                      and not self.cfg.get("is_supervisor")):
+                    self._text_only_nudged = True
+                    self.ingest_task("turn-guard", TEXT_ONLY_TURN_NUDGE)
+                    log.info("[%s] read-only/no-op turn ended in summary — enqueued one corrective", self.name)
+            except Exception as e:
+                log.debug("[%s] text-only guard failed: %s", self.name, e)
         except Exception as exc:
             log.error("[%s] Batch failed: %s", self.name, exc)
             monitor_db.log_event(self.name, "error", data={"error": str(exc), "task_ids": task_ids})

@@ -180,6 +180,13 @@ DEFAULT_MODEL = os.environ.get("SWARM_DEFAULT_MODEL", "litellm-model")
 AVAILABLE_MODELS_FALLBACK = [m.strip() for m in os.environ.get(
     "SWARM_FALLBACK_MODELS", "litellm-model,kimi").split(",") if m.strip()]
 
+# Model used ONLY for browser_vision (screenshot reading). The main agent model
+# may be text-only (DeepSeek/Kimi), so vision is pinned to a multimodal model the
+# proxy serves. gpt-5.4-nano is verified to accept image_url input via the proxy;
+# gpt-5.4-mini is not deployed on the backing Azure resource. Override with
+# SWARM_VISION_MODEL if the proxy's vision model changes.
+VISION_MODEL = os.environ.get("SWARM_VISION_MODEL", "gpt-5.4-nano")
+
 
 def list_proxy_models(base_url: Optional[str] = None, api_key: Optional[str] = None) -> List[str]:
     """Return the model ids an OpenAI-compatible backend serves (for the dropdown).
@@ -315,7 +322,7 @@ DISABLED_TOOLSETS: List[str] = [
     "session_search",  # cross-session search — unused; also drops its guidance block
     "delegation",      # delegate_task — soul says disabled; peers via send_peer_message
     "tts",             # text_to_speech
-    "image_gen", "video_gen", "video", "vision",  # media generation — not used
+    "image_gen", "video_gen", "video",  # media generation — not used
     "spotify", "homeassistant", "discord", "discord_admin",
     "feishu_doc", "feishu_drive", "hermes-yuanbao",
     "moa", "messaging",  # third-party integrations the swarm never calls
@@ -519,6 +526,7 @@ def write_agent_hermes_config(
     provider: str = "custom",
     base_url: Optional[str] = None,
     api_key: Optional[str] = None,
+    is_supervisor: bool = False,
 ) -> None:
     """Write/merge the Hermes config.yaml under an agent's isolated HERMES_HOME.
 
@@ -611,6 +619,17 @@ def write_agent_hermes_config(
         aux_section[_task] = task_cfg
     # The summarizer shares the main window; tell its feasibility check.
     aux_section["compression"]["context_length"] = AGENT_CONTEXT_WINDOW
+    # Vision (browser_vision screenshot reading) is special: it MUST use a
+    # multimodal model even when the main model is text-only. We pin it to
+    # VISION_MODEL on the same proxy. Supplying both base_url AND api_key forces
+    # the deterministic "custom endpoint" branch in
+    # auxiliary_client.resolve_vision_provider_client, bypassing the capability
+    # heuristic that would otherwise drop to unauthenticated aggregators (Gemini/
+    # OpenRouter) and fail. Without this entry the "vision" task resolves to
+    # provider="auto" and browser_vision raises "No LLM provider configured".
+    vision_cfg = dict(aux_endpoint)
+    vision_cfg["model"] = VISION_MODEL
+    aux_section["vision"] = {**aux_section.get("vision", {}), **vision_cfg}
     existing["auxiliary"] = aux_section
 
     # Pin ddgs (DuckDuckGo, no API key) as the web search backend so web_search
@@ -627,7 +646,18 @@ def write_agent_hermes_config(
     agent_section = existing.get("agent")
     if not isinstance(agent_section, dict):
         agent_section = {}
-    agent_section["disabled_toolsets"] = list(DISABLED_TOOLSETS)
+    _disabled = list(DISABLED_TOOLSETS)
+    if is_supervisor:
+        # Supervisors must OBSERVE, not do project work — "do no project tasks" is
+        # otherwise just a request the model ignores (the saas overseer ran 57
+        # terminal commands and joined the very loop it was meant to police).
+        # Physically remove the action toolsets so a supervisor structurally CANNOT
+        # run commands, browse, execute code, or web-search. It keeps file-read,
+        # memory, and the swarm tools (send_peer_message, pause_agent, log_decision,
+        # ask_human) — everything oversight needs and nothing project work needs.
+        _disabled += [t for t in ("terminal", "browser", "code_execution", "web")
+                      if t not in _disabled]
+    agent_section["disabled_toolsets"] = _disabled
     existing["agent"] = agent_section
 
     # Cap individual tool-result size so a giant browser snapshot / file read

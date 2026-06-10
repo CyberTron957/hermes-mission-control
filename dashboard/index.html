@@ -106,6 +106,9 @@ input, button, select, textarea { font-family: inherit; letter-spacing: inherit;
 .ov-agents { top: calc(var(--topbar-h) + 12px); left: 14px; width: 304px; max-height: calc(50vh); }
 .ov-queue { left: 14px; bottom: 14px; width: 304px; max-height: 32vh; }
 .ov-right { top: calc(var(--topbar-h) + 12px); right: 14px; bottom: 14px; width: 404px; max-width: calc(100vw - 28px); }
+/* Right panel is anchored top+bottom, so collapsing must drop the bottom
+   anchor — otherwise the empty glass box stays full-height ("compact" no-op). */
+.ov-right.collapsed { bottom: auto; }
 .ov-log { left: 332px; right: 432px; bottom: 0; max-height: 240px; }
 .panel-header { background: rgba(20,20,24,0.6); padding: 11px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-shrink: 0; }
 .panel-header .ph-actions { display: flex; align-items: center; gap: 6px; }
@@ -454,19 +457,19 @@ input, button, select, textarea { font-family: inherit; letter-spacing: inherit;
 
 <!-- Messages / Live / Digests (right) -->
 <div class="ov ov-right" id="ov-right">
-    <div class="panel-header"><span id="msg-header">Messages</span>
+    <div class="panel-header"><span id="msg-header">Live Execution</span>
         <div class="ph-actions">
             <span style="font-size:10px;color:var(--text-muted)" id="msg-count">0</span>
             <span class="ov-collapse" onclick="togglePanel('ov-right')" title="Collapse">▾</span>
         </div>
     </div>
     <div class="view-tabs">
-        <button class="view-tab active" id="tab-history" onclick="setView('history')">📜 History</button>
-        <button class="view-tab" id="tab-live" onclick="setView('live')"><span class="live-dot"></span>Live Execution</button>
+        <button class="view-tab" id="tab-history" onclick="setView('history')">📜 History</button>
+        <button class="view-tab active" id="tab-live" onclick="setView('live')"><span class="live-dot"></span>Live Execution</button>
         <button class="view-tab" id="tab-digests" onclick="setView('digests')">🧭 Digests</button>
     </div>
-    <div class="panel-body" id="message-list"><div class="empty-state"><div class="empty-state-icon">💬</div><div>Select an agent</div></div></div>
-    <div class="panel-body exec-trace" id="exec-trace" style="display:none"><div class="empty-state"><div class="empty-state-icon">⚡</div><div>Select an agent</div></div></div>
+    <div class="panel-body" id="message-list" style="display:none"><div class="empty-state"><div class="empty-state-icon">💬</div><div>Select an agent</div></div></div>
+    <div class="panel-body exec-trace" id="exec-trace"><div class="empty-state"><div class="empty-state-icon">⚡</div><div>Select an agent</div></div></div>
     <div class="panel-body" id="digest-list" style="display:none"><div class="empty-state"><div class="empty-state-icon">🧭</div><div>Select an agent</div></div></div>
     <div class="controls-section">
         <div style="display:flex;gap:5px">
@@ -647,7 +650,7 @@ let currentTeam = null;
 let teamsCache = [];
 let modelsCache = [];
 // Live execution trace state (ephemeral; per agent, cleared each turn).
-let viewMode = 'history';        // 'history' | 'live'
+let viewMode = 'live';           // 'history' | 'live' | 'digests' — Live by default
 let execTrace = {};              // agent -> [ {type:'reasoning'|'tool', ...} ]
 let execAnswer = {};             // agent -> accumulated streamed answer text
 let execStatus = {};             // agent -> latest transient status line (or null)
