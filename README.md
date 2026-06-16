@@ -27,22 +27,31 @@ real-time console to command them.
 Install and run Hermes Swarm on this machine for me.
 
 Hermes Swarm (https://github.com/CyberTron957/hermes-mission-control) is a
-self-hosted multi-agent server with a real-time dashboard. Please:
+self-hosted multi-agent server with a real-time dashboard.
 
-1. Check prerequisites first: Python 3.11+ (or Docker). If something is missing,
-   tell me before installing any system packages.
-2. Clone the repo into ./hermes-swarm and run its installer: `bash install.sh`.
-   It creates a .venv, installs dependencies, and installs Chromium for the
-   browser tools. (Pass `--no-browser` if Chromium can't install — everything
-   else still works.)
-3. The installer runs `hermes setup` to pick an LLM provider + API key — PAUSE
-   and ask me which provider to use and for the key. Do not guess or hardcode one.
-4. Verify with `hermes-swarm doctor` and fix anything it flags.
-5. Scaffold a starter team and start the server: `hermes-swarm init && hermes-swarm up`.
-6. Confirm the dashboard is live at http://127.0.0.1:8000, then tell me how to
-   open it and build my first team with the Architect.
+First ask me for my LLM provider details, then proceed unattended:
+  - provider (e.g. openai, anthropic, or "custom" for an OpenAI-compatible / proxy endpoint)
+  - model name
+  - API key
+  - base URL (only for custom/proxy, e.g. http://localhost:4000/v1)
 
-Keep my API key local. Don't commit anything or send data anywhere.
+Then:
+1. Check Python 3.11+ (or Docker). If missing, tell me before installing system packages.
+2. If ./hermes-swarm doesn't exist, clone the repo there. Run the installer
+   non-interactively: `bash install.sh --no-run`. It auto-skips the interactive
+   wizard when there's no TTY, so it won't hang. (Add `--no-browser` only if the
+   Chromium download fails — everything else still works.)
+3. Configure my provider with the supported NON-interactive command (do NOT run
+   the interactive `hermes setup`, and do NOT edit Python internals):
+     .venv/bin/hermes-swarm set-model --provider <p> --model <m> [--base-url <url>] --api-key <key>
+4. Verify: `.venv/bin/hermes-swarm doctor` (a "backend not reachable" warning is
+   fine if my model server isn't running yet).
+5. Scaffold a team and start the server detached/in the background:
+     .venv/bin/hermes-swarm init
+     .venv/bin/hermes-swarm up      # run in the background; confirm http://127.0.0.1:8000 responds
+6. Tell me how to open the dashboard and build my first team with the Architect.
+
+Keep my API key local — don't commit it or send it anywhere.
 ```
 
 </details>
@@ -127,7 +136,9 @@ bash install.sh
 ## How it works
 
 1. **Configure a provider** - one `hermes setup` wizard: pick from 40+ providers,
-   paste a key, choose a model.
+   paste a key, choose a model. *(Headless / scripting? Set it non-interactively
+   with `hermes-swarm set-model --provider … --model … [--base-url …] --api-key …`,
+   or the `SWARM_SETUP_*` env vars the installer reads.)*
 2. **Build a team** - tell the Architect what you want; it proposes the agents,
    their roles, and who talks to whom, then builds it on your approval.
 3. **Deploy & steer** - hand the team a mission and watch it run from the console.

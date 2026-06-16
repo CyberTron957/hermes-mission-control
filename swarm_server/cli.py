@@ -201,6 +201,45 @@ def cmd_init(args) -> int:
     return 0
 
 
+def cmd_set_model(args) -> int:
+    """Set the swarm's default provider/model non-interactively.
+
+    A scriptable alternative to the interactive ``hermes setup`` wizard — for
+    AI-agent installs, CI, and headless servers where no TTY is available. Writes
+    to the swarm's shared config (``data/.hermes-shared``), which every agent
+    reads as its default. Example:
+
+      hermes-swarm set-model --provider custom --model deepseek-chat \\
+        --base-url http://localhost:4000/v1 --api-key sk-...
+    """
+    import re
+    from swarm_server.model_config import set_default_model, get_default_model
+
+    model = (args.model or "").strip()
+    if not model:
+        print("error: --model is required", file=sys.stderr)
+        return 2
+    provider = (args.provider or "").strip()
+    base_url = (args.base_url or "").strip()
+    api_key = args.api_key or ""
+    if not provider:
+        provider = "custom" if base_url else "openai"
+    if base_url:
+        if "://" not in base_url:
+            base_url = "http://" + base_url           # tolerate a bare host:port
+        if not re.search(r"/v\d+/?$", base_url.rstrip("/") + "/"):
+            print(f"note: base-url '{base_url}' doesn't end in a version path (e.g. /v1) — "
+                  "most OpenAI-compatible endpoints need one. Writing it as given.")
+    set_default_model(provider=provider, model=model, base_url=base_url, api_key=api_key)
+    cur = get_default_model()
+    shown = f"provider={cur.get('provider') or provider} model={cur.get('model') or model}"
+    if base_url:
+        shown += f" base_url={base_url}"
+    print(f"✓ Default model set ({shown}).")
+    print("  Written to the swarm's shared config. Verify reachability with: hermes-swarm doctor")
+    return 0
+
+
 def main(argv=None) -> int:
     _setup_logging()
     p = argparse.ArgumentParser(
@@ -221,6 +260,16 @@ def main(argv=None) -> int:
     init.add_argument("--agent", default="coordinator", help="agent id (slug)")
     init.add_argument("--agent-name", default=None, help="agent display name")
     init.set_defaults(func=cmd_init)
+
+    sm = sub.add_parser("set-model",
+        help="Set the default provider/model non-interactively (scriptable alt to `hermes setup`)")
+    sm.add_argument("--model", required=True, help="model name (e.g. deepseek-chat, gpt-4o)")
+    sm.add_argument("--provider", default=None,
+        help="provider id (e.g. custom, openai, anthropic); defaults to 'custom' when --base-url is set")
+    sm.add_argument("--base-url", default=None,
+        help="OpenAI-compatible endpoint, e.g. http://localhost:4000/v1 (for custom/proxy)")
+    sm.add_argument("--api-key", default=None, help="API key for the provider (stored in the home .env)")
+    sm.set_defaults(func=cmd_set_model)
 
     args = p.parse_args(argv)
     func = getattr(args, "func", None)

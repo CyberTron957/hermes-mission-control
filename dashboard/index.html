@@ -65,9 +65,12 @@ input, button, select, textarea { font-family: inherit; letter-spacing: inherit;
 #network-svg g[role="button"]:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 3px; }
 button.msg-header, button.cc-divider, button.exec-label { width: 100%; }
 .tnum, .stat-badge, .queue-badge, .queue-bar-count, .msg-time, .ev-time, .cfg-telemetry, #net-info, .topbar-stats { font-variant-numeric: tabular-nums; }
-/* Architect: a distinct centered capsule, set apart from the square tool buttons. */
+/* Architect: a distinct centered capsule, set apart from the square tool buttons.
+   It's the middle item of the 3-zone flex topbar (stats | architect | controls)
+   with both side zones flex:1, so it stays optically centered without absolute
+   positioning — which means the side zones can never flow underneath it. */
 #architect-btn {
-    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    flex: 0 0 auto;
     display: inline-flex; align-items: center; gap: 7px;
     padding: 7px 18px; border-radius: 999px; cursor: pointer;
     font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
@@ -77,9 +80,8 @@ button.msg-header, button.cc-divider, button.exec-label { width: 100%; }
     transition: box-shadow 0.2s, transform 0.05s, background 0.2s; white-space: nowrap;
 }
 #architect-btn:hover { background: linear-gradient(180deg, var(--bg-card), var(--bg-hover)); box-shadow: 0 0 0 1px rgba(69,214,232,0.25), 0 8px 26px -8px rgba(69,214,232,0.85); }
-#architect-btn:active { transform: translate(-50%, -50%) scale(0.97); }
+#architect-btn:active { transform: scale(0.97); }
 #architect-btn .ic { color: var(--tool); }
-@media (max-width: 820px) { #architect-btn { padding: 6px 13px; font-size: 11px; } }
 .topbar {
     background: rgba(0,0,0,0.78);
     -webkit-backdrop-filter: blur(14px);
@@ -90,18 +92,23 @@ button.msg-header, button.cc-divider, button.exec-label { width: 100%; }
     box-sizing: border-box;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 14px;
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     z-index: 100;
 }
-.logo { font-size: 12px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 10px; text-transform: uppercase; letter-spacing: 0.18em; }
-.logo::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--idle); animation: pulse-dot 2.4s infinite; }
+.logo { font-size: 12px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 10px; text-transform: uppercase; letter-spacing: 0.18em; flex-shrink: 0; }
+.logo::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--idle); animation: pulse-dot 2.4s infinite; flex-shrink: 0; }
 @keyframes pulse-dot { 50% { opacity: 0.35; } }
-.topbar-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); align-items: center; }
-.topbar-stats > span { display: inline-flex; align-items: center; gap: 6px; }
+/* Left zone (stats) and right zone (controls) each take an equal flex share so
+   the architect capsule sits dead-centre; min-width:0 lets them shrink. */
+.topbar-stats { flex: 1 1 auto; min-width: 0; display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); align-items: center; overflow: hidden; }
+.topbar-stats > span { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.topbar-right { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.topbar-right > * { flex-shrink: 0; }
+#team-select { min-width: 0; }
 .stat-badge { background: transparent; padding: 2px 7px; border-radius: var(--r-sm); font-weight: 600; font-size: 11px; font-family: var(--font-mono); color: var(--text); border: 1px solid var(--border-strong); }
 .ws-status { display: flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 10px; border-radius: var(--r-sm); background: transparent; border: 1px solid var(--border-strong); color: var(--text-muted); }
 .ws-status.connected { border-color: rgba(62,207,142,0.45); color: var(--idle); }
@@ -261,7 +268,7 @@ button.msg-header, button.cc-divider, button.exec-label { width: 100%; }
 .control-input::placeholder, .control-textarea::placeholder { color: var(--text-dim); }
 .control-input:focus, .control-select:focus, .control-textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .control-textarea { min-height: 50px; resize: vertical; line-height: 1.5; }
-.btn { background: var(--accent); color: var(--accent-ink); border: 1px solid transparent; border-radius: var(--r-sm); padding: 9px 16px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; width: 100%; }
+.btn { background: var(--accent); color: var(--accent-ink); border: 1px solid transparent; border-radius: var(--r-sm); padding: 9px 16px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; width: 100%; white-space: nowrap; }
 .btn:hover { background: #D6D6DB; }
 .btn:active { background: #BFBFC6; }
 .btn-secondary { background: transparent; border: 1px solid var(--border-strong); color: var(--text); }
@@ -448,10 +455,38 @@ button.msg-header, button.cc-divider, button.exec-label { width: 100%; }
 .proposal-changes { font-family: var(--font-mono); font-size: 10.5px; background: var(--bg-input); border-radius: var(--r-sm); padding: 8px 10px; margin: 7px 0; white-space: pre-wrap; word-break: break-word; border: 1px solid var(--border); }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ===== RESPONSIVE TOPBAR =====
+   The bar degrades in tiers so items never overlap: first the right-hand tool
+   buttons drop their labels to icon-only, then the stat labels collapse to
+   bare badges, then non-essential stats are dropped, and finally the architect
+   capsule and the logo wordmark reduce to glyphs. Every collapsed control keeps
+   its title/aria-label, so nothing becomes unreachable. */
+@media (max-width: 1320px) {
+    .topbar { gap: 10px; }
+    .topbar-right { gap: 8px; }
+    /* tool buttons → icon-only */
+    .topbar-right .btn .tb-label,
+    #ws-status .tb-label { display: none; }
+    .topbar-right .btn { padding: 6px 9px; }
+}
 @media (max-width: 1100px) {
     .left-col { width: 260px; }
     .ov-right { width: 340px; }
     .ov-log { left: 288px; right: 368px; }
+    /* stat words collapse to bare badges; drop the cost readout */
+    .topbar { padding: 0 14px; }
+    .topbar-stats { gap: 11px; }
+    .tb-stat-label { display: none; }
+    .topbar-stats .tb-stat-cost { display: none !important; }
+    #team-select { max-width: 150px; }
+}
+@media (max-width: 900px) {
+    /* logo + architect → glyph only; trim the lower-priority Events stat */
+    .logo-text { display: none; }
+    .topbar-stats .tb-stat-events { display: none; }
+    #architect-btn { padding: 7px 11px; gap: 0; }
+    #architect-btn .tb-label { display: none; }
 }
 @media (max-width: 820px) {
     .left-col { width: calc(100vw - 28px); bottom: auto; height: 38vh; }
@@ -460,22 +495,31 @@ button.msg-header, button.cc-divider, button.exec-label { width: 100%; }
     .ov-log { left: 14px; right: 14px; }
     .zoom-controls { left: auto; right: 16px; transform: none; bottom: auto; top: calc(var(--topbar-h) + 8px); }
 }
+@media (max-width: 640px) {
+    /* phone: the canvas + panels carry the numbers, so the bar keeps only
+       controls. Stats hide; team-select is the one control allowed to shrink. */
+    .topbar { padding: 0 12px; gap: 8px; }
+    .topbar-stats { gap: 8px; }
+    .topbar-stats .tb-stat { display: none; }
+    .topbar-right { gap: 6px; }
+    #team-select { flex: 1 1 auto; min-width: 72px; max-width: 132px; }
+}
 </style>
 </head>
 <body>
 <div class="topbar">
     <div class="topbar-stats">
-        <span class="logo">Hermes Swarm</span>
-        <span>Agents <span class="stat-badge" id="stat-agents">0</span></span>
-        <span>Busy <span class="stat-badge" id="stat-busy">0</span></span>
-        <span>Queued <span class="stat-badge" id="stat-queued">0</span></span>
-        <span>Events <span class="stat-badge" id="stat-events">0</span></span>
-        <span id="stat-cost-wrap" style="display:none;cursor:help" title="">Cost 24h <span class="stat-badge" id="stat-cost">—</span></span>
+        <span class="logo"><span class="logo-text">Hermes Swarm</span></span>
+        <span class="tb-stat"><span class="tb-stat-label">Agents</span> <span class="stat-badge" id="stat-agents">0</span></span>
+        <span class="tb-stat"><span class="tb-stat-label">Busy</span> <span class="stat-badge" id="stat-busy">0</span></span>
+        <span class="tb-stat"><span class="tb-stat-label">Queued</span> <span class="stat-badge" id="stat-queued">0</span></span>
+        <span class="tb-stat tb-stat-events"><span class="tb-stat-label">Events</span> <span class="stat-badge" id="stat-events">0</span></span>
+        <span class="tb-stat tb-stat-cost" id="stat-cost-wrap" style="display:none;cursor:help" title=""><span class="tb-stat-label">Cost 24h</span> <span class="stat-badge" id="stat-cost">—</span></span>
     </div>
-    <button id="architect-btn" onclick="toggleMaster()" title="Chat with the Architect — it designs and builds agent teams for you"><span data-icon="compass" data-icon-size="14"></span> Architect</button>
-    <div style="display:flex;align-items:center;gap:12px">
-        <button id="inbox-btn" class="btn btn-sm btn-secondary" onclick="toggleInbox()" style="position:relative;">
-            <span data-icon="mail" data-icon-size="13"></span> Inbox
+    <button id="architect-btn" onclick="toggleMaster()" title="Chat with the Architect — it designs and builds agent teams for you"><span data-icon="compass" data-icon-size="14"></span> <span class="tb-label">Architect</span></button>
+    <div class="topbar-right">
+        <button id="inbox-btn" class="btn btn-sm btn-secondary" onclick="toggleInbox()" aria-label="Open inbox" style="position:relative;">
+            <span data-icon="mail" data-icon-size="13"></span> <span class="tb-label">Inbox</span>
             <span id="inbox-badge" role="status" aria-label="Pending inbox items" style="
                 display:none;
                 position:absolute;top:-5px;right:-5px;
@@ -483,14 +527,14 @@ button.msg-header, button.cc-divider, button.exec-label { width: 100%; }
                 font-weight:700;padding:1px 6px;border-radius:10px;
             ">0</span>
         </button>
-        <button class="btn btn-sm btn-secondary" onclick="showModelSettings(false)" title="Default model for all agents"><span data-icon="cpu" data-icon-size="13"></span> Model</button>
-        <button class="btn btn-sm btn-secondary" onclick="openBrowserPanel(currentTeam)" title="Watch & control this team's browser live"><span data-icon="globe" data-icon-size="13"></span> Browser</button>
-        <button id="team-pause-btn" class="btn btn-sm btn-secondary" data-mode="pause" onclick="toggleTeamPause()" style="display:none" title="Freeze every agent on this team"><span data-icon="clock" data-icon-size="13"></span> Pause team</button>
+        <button class="btn btn-sm btn-secondary" onclick="showModelSettings(false)" aria-label="Model settings" title="Default model for all agents"><span data-icon="cpu" data-icon-size="13"></span> <span class="tb-label">Model</span></button>
+        <button class="btn btn-sm btn-secondary" onclick="openBrowserPanel(currentTeam)" aria-label="Open team browser" title="Watch & control this team's browser live"><span data-icon="globe" data-icon-size="13"></span> <span class="tb-label">Browser</span></button>
+        <button id="team-pause-btn" class="btn btn-sm btn-secondary" data-mode="pause" onclick="toggleTeamPause()" style="display:none" aria-label="Pause team" title="Freeze every agent on this team"><span data-icon="clock" data-icon-size="13"></span> <span class="tb-label">Pause team</span></button>
         <label for="team-select" class="sr-only">Team</label>
         <select id="team-select" onchange="changeTeam(this.value)"><option value="">Loading teams...</option></select>
-        <button class="btn btn-sm btn-secondary" onclick="showAddTeam()">+ New Team</button>
+        <button class="btn btn-sm btn-secondary" onclick="showAddTeam()" aria-label="Add team" title="Create a new team"><span aria-hidden="true">+</span> <span class="tb-label">New Team</span></button>
         <button class="btn btn-sm btn-secondary" onclick="deleteTeam()" title="Delete the current team and all its agents" aria-label="Delete the current team" style="color:var(--danger)"><span data-icon="trash" data-icon-size="13"></span></button>
-        <div class="ws-status disconnected" id="ws-status" role="status"><span class="ws-dot"></span><span id="ws-text">Disconnected</span></div>
+        <div class="ws-status disconnected" id="ws-status" role="status" title="Connection status"><span class="ws-dot"></span><span id="ws-text" class="tb-label">Disconnected</span></div>
     </div>
 </div>
 

@@ -20,11 +20,16 @@
 #     --yes, -y     non-interactive: never prompt (also skips the setup wizard)
 #     --help, -h    show this help
 #
+# Hands-free provider config (AI-agent / CI installs) — set before running:
+#   SWARM_SETUP_MODEL=deepseek-chat  SWARM_SETUP_BASE_URL=http://localhost:4000/v1
+#   SWARM_SETUP_PROVIDER=custom      SWARM_SETUP_API_KEY=sk-...
+#   (only SWARM_SETUP_MODEL is required; the installer then skips the interactive wizard)
+#
 # Prefer containers? Use Docker instead:  docker compose up --build
 #
 set -euo pipefail
 
-usage() { sed -n '2,23p' "$0" | sed 's/^#\{0,1\} \{0,1\}//'; }
+usage() { sed -n '2,28p' "$0" | sed 's/^#\{0,1\} \{0,1\}//'; }
 
 # ---- pretty output --------------------------------------------------------
 if [ -t 1 ]; then B=$'\e[1m'; G=$'\e[32m'; Y=$'\e[33m'; R=$'\e[31m'; X=$'\e[0m'; else B= G= Y= R= X=; fi
@@ -142,10 +147,21 @@ fi
 # ---- 5. provider / model (adopt existing, else set up) -------------------
 step "Provider / model"
 is_configured() { "$PY" -c 'import sys; from swarm_server.model_config import is_model_configured; sys.exit(0 if is_model_configured() else 1)' 2>/dev/null; }
-if is_configured; then
+if [ -n "${SWARM_SETUP_MODEL:-}" ]; then
+  # Non-interactive config for AI-agent / CI / headless installs. Set:
+  #   SWARM_SETUP_MODEL=...  [SWARM_SETUP_PROVIDER=...]  [SWARM_SETUP_BASE_URL=...]  [SWARM_SETUP_API_KEY=...]
+  info "Configuring provider from SWARM_SETUP_* env (non-interactive)…"
+  "$VENV/bin/hermes-swarm" set-model \
+    ${SWARM_SETUP_PROVIDER:+--provider "$SWARM_SETUP_PROVIDER"} \
+    --model "$SWARM_SETUP_MODEL" \
+    ${SWARM_SETUP_BASE_URL:+--base-url "$SWARM_SETUP_BASE_URL"} \
+    ${SWARM_SETUP_API_KEY:+--api-key "$SWARM_SETUP_API_KEY"} \
+    || warn "set-model failed — configure later with: $VENV/bin/hermes-swarm set-model --help"
+elif is_configured; then
   info "A provider is already configured (your ~/.hermes or a swarm default) — adopting it. Nothing to do."
 elif [ "$NO_SETUP" -eq 1 ] || [ "$ASSUME_YES" -eq 1 ] || [ ! -t 0 ]; then
-  warn "No provider configured. Run it yourself when ready:  $VENV/bin/hermes setup"
+  warn "No provider configured. Set one non-interactively:  $VENV/bin/hermes-swarm set-model --model <m> [--base-url <url>] [--api-key <k>]"
+  warn "…or run the interactive wizard:  $VENV/bin/hermes setup"
 else
   info "No provider configured — launching Hermes' setup wizard (40+ providers)…"
   "$VENV/bin/hermes" setup || warn "hermes setup didn't finish — rerun: $VENV/bin/hermes setup"
