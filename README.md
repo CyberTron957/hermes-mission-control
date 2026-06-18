@@ -47,10 +47,12 @@ self-hosted multi-agent server with a real-time dashboard.
    full wizard myself anytime: `.venv/bin/hermes-swarm setup`. Offer to run it.
 5. Verify: `.venv/bin/hermes-swarm doctor` (a "backend not reachable" warning is
    fine if my model server isn't running yet).
-6. Scaffold a team and start the server detached/in the background:
+6. Scaffold a team and start the server detached:
      .venv/bin/hermes-swarm init
-     nohup .venv/bin/hermes-swarm up > swarm.log 2>&1 &   # detached
-   Confirm http://127.0.0.1:8000 responds (`.venv/bin/hermes-swarm status`).
+     .venv/bin/hermes-swarm up --detach   # daemonizes and returns; don't background it yourself
+   It prints the URL once /health is up. Confirm with `.venv/bin/hermes-swarm status`.
+   (Use `up --detach`, NOT `nohup … &` — backgrounding it from your shell means it
+   dies when your session/process group ends.)
 7. Tell me how to manage it and build my first team:
      - open the dashboard at http://127.0.0.1:8000 and use the Architect
      - check status:  .venv/bin/hermes-swarm status

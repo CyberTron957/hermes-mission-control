@@ -814,8 +814,9 @@ self-hosted multi-agent server with a real-time dashboard. Please:
    web-search / vision / browser / memory tools anytime with
    `.venv/bin/hermes-swarm setup`.
 4. Verify with `.venv/bin/hermes-swarm doctor` and fix anything it flags.
-5. Scaffold a team and start it detached:
-   `.venv/bin/hermes-swarm init && nohup .venv/bin/hermes-swarm up > swarm.log 2>&1 &`.
+5. Scaffold a team and start it detached (use --detach, NOT nohup/& — backgrounding
+   it from your shell kills it when your session ends):
+   `.venv/bin/hermes-swarm init && .venv/bin/hermes-swarm up --detach`.
 6. Confirm the dashboard is live at http://127.0.0.1:8000 (`hermes-swarm status`),
    then tell me how to open it, build my first team with the Architect, and manage
    the server (`hermes-swarm status` / `hermes-swarm down` / `hermes-swarm setup`).

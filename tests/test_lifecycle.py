@@ -101,6 +101,32 @@ def test_down_signals_and_clears(monkeypatch, tmp_path, capsys):
     assert "Stopped" in capsys.readouterr().out
 
 
+# ---- up / detach dispatch ----------------------------------------------------
+def test_up_runs_foreground_when_not_detached(monkeypatch):
+    called = {}
+    monkeypatch.setattr(cli, "_serve", lambda a: called.setdefault("serve", True) or 0)
+    monkeypatch.setattr(cli, "_start_detached", lambda a: called.setdefault("detach", True) or 0)
+    cli.cmd_up(argparse.Namespace(detach=False))
+    assert called == {"serve": True}
+
+
+def test_up_daemonizes_when_detached(monkeypatch):
+    called = {}
+    monkeypatch.setattr(cli, "_serve", lambda a: called.setdefault("serve", True) or 0)
+    monkeypatch.setattr(cli, "_start_detached", lambda a: called.setdefault("detach", True) or 0)
+    cli.cmd_up(argparse.Namespace(detach=True))
+    assert called == {"detach": True}
+
+
+def test_detach_is_noop_when_already_running(monkeypatch, capsys):
+    # Already up → report and return WITHOUT forking (guard runs before os.fork).
+    monkeypatch.setattr(cli, "_running_pid", lambda: 123)
+    monkeypatch.setattr(cli, "_probe_health", lambda *a, **k: True)
+    rc = cli._start_detached(argparse.Namespace(detach=True, log=None))
+    assert rc == 0
+    assert "already running" in capsys.readouterr().out
+
+
 # ---- setup -------------------------------------------------------------------
 def test_setup_invokes_hermes_against_shared_home(monkeypatch, tmp_path, capsys):
     import swarm_server.model_config as mc

@@ -75,6 +75,74 @@ def _setup_logging() -> None:
 
 
 def cmd_up(args) -> int:
+    """Run the server — in the foreground, or detached with `--detach`."""
+    if getattr(args, "detach", False):
+        return _start_detached(args)
+    return _serve(args)
+
+
+def _start_detached(args) -> int:
+    """Daemonize and return immediately, leaving the server running independently.
+
+    Why this exists: `nohup hermes-swarm up &` does NOT reliably survive an AI
+    coding agent starting it — the agent's bash tool kills its whole process
+    group when the command returns, taking the backgrounded server with it (the
+    server answers once, then vanishes, and `status` reports it down). A real
+    double-fork + setsid detaches into its own session so it outlives the
+    launching shell/agent.
+    """
+    import time
+
+    from swarm_server.config import DATA_ROOT, SERVER_HOST, SERVER_PORT
+
+    if not hasattr(os, "fork"):
+        print("--detach needs POSIX fork (Linux/macOS). On Windows, run "
+              "`hermes-swarm up` under a service manager, or use Docker.",
+              file=sys.stderr)
+        return 2
+
+    if _running_pid() and _probe_health(SERVER_HOST, SERVER_PORT):
+        print(f"● already running (pid {_running_pid()}) → "
+              f"http://{SERVER_HOST}:{SERVER_PORT}/")
+        return 0
+
+    log_path = getattr(args, "log", None) or str(DATA_ROOT / "swarm.log")
+    DATA_ROOT.mkdir(parents=True, exist_ok=True)
+
+    pid = os.fork()
+    if pid > 0:
+        # Parent: wait (≤20s) for the daemon to answer /health, then report + return.
+        for _ in range(40):
+            time.sleep(0.5)
+            if _probe_health(SERVER_HOST, SERVER_PORT):
+                print(f"● started (pid {_running_pid() or '?'}) → "
+                      f"http://{SERVER_HOST}:{SERVER_PORT}/")
+                print(f"  logs:    {log_path}")
+                print(f"  status:  hermes-swarm status   ·   stop:  hermes-swarm down")
+                return 0
+        print(f"Started, but it hasn't answered /health yet — check the log: {log_path}",
+              file=sys.stderr)
+        return 0
+
+    # First child: new session leader, then fork again so the daemon can never
+    # reacquire a controlling terminal.
+    os.setsid()
+    if os.fork() > 0:
+        os._exit(0)
+
+    # Grandchild = the daemon. Detach stdio to the log file and serve.
+    try:
+        with open(os.devnull, "rb") as devnull:
+            os.dup2(devnull.fileno(), sys.stdin.fileno())
+        logf = open(log_path, "ab", buffering=0)
+        os.dup2(logf.fileno(), sys.stdout.fileno())
+        os.dup2(logf.fileno(), sys.stderr.fileno())
+    except Exception:
+        pass
+    os._exit(_serve(args))
+
+
+def _serve(args) -> int:
     """Launch uvicorn serving the FastAPI app (host/port from env)."""
     import uvicorn
 
@@ -397,6 +465,10 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd")
 
     up = sub.add_parser("up", help="Run the swarm server + dashboard")
+    up.add_argument("-d", "--detach", action="store_true",
+        help="daemonize and return immediately (survives the launching shell/agent)")
+    up.add_argument("--log", default=None,
+        help="log file for --detach (default: <data>/swarm.log)")
     up.set_defaults(func=cmd_up)
 
     down = sub.add_parser("down", help="Stop a server started with `up` (incl. detached)")
