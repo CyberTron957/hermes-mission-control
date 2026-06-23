@@ -296,14 +296,110 @@ button.msg-header, button.cc-divider, button.exec-label { width: 100%; }
 .empty-state-icon { font-size: 28px; margin-bottom: 10px; opacity: 0.35; }
 .agent-actions { display: flex; gap: 6px; margin-top: 9px; }
 
-/* ===== ONBOARDING TUTORIAL ===== */
-.onboarding-tutorial { padding: 18px; border: 1px dashed var(--border-strong); border-radius: var(--r-md); background: var(--bg-card); margin: 12px 14px; text-align: left; }
-.onboarding-tutorial h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--tool); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px; }
-.onboarding-tutorial p { font-size: 12px; line-height: 1.5; color: var(--text-secondary); margin-bottom: 12px; }
-.onboarding-step { margin-bottom: 16px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--r-sm); }
-.onboarding-step:last-child { margin-bottom: 0; }
-.onboarding-step h4 { font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text); display: flex; align-items: center; gap: 6px; }
-.onboarding-step p { font-size: 11px; line-height: 1.4; color: var(--text-muted); margin-bottom: 10px; }
+/* ===== CANVAS ONBOARDING ===== */
+.canvas-onboarding {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(10, 10, 11, 0.95);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-lg);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 0 1px rgba(69,214,232,0.15);
+    padding: 28px;
+    z-index: 40;
+    text-align: left;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    max-width: 540px;
+    margin: 0 auto;
+    width: auto;
+}
+@media (min-width: 1101px) {
+    .canvas-onboarding {
+        left: 332px;  /* left-col (304) + padding */
+        right: 432px; /* ov-right (404) + padding */
+    }
+}
+@media (min-width: 821px) and (max-width: 1100px) {
+    .canvas-onboarding {
+        left: 288px;  /* left-col (260) + padding */
+        right: 368px; /* ov-right (340) + padding */
+    }
+}
+@media (max-width: 820px) {
+    .canvas-onboarding {
+        left: 14px;
+        right: 14px;
+    }
+}
+.canvas-onboarding h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.canvas-onboarding h2 .ic {
+    color: var(--tool);
+}
+.canvas-onboarding p.subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 24px;
+}
+.onboarding-option {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 18px;
+    margin-bottom: 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.onboarding-option:hover {
+    border-color: var(--border-strong);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.onboarding-option.architect {
+    border-color: rgba(69,214,232,0.3);
+}
+.onboarding-option.architect:hover {
+    border-color: var(--tool);
+    box-shadow: 0 0 15px rgba(69,214,232,0.15);
+}
+.onboarding-option h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.onboarding-option.architect h3 {
+    color: var(--tool);
+}
+.onboarding-option p {
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+.onboarding-option .btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 32px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
 
 /* ===== INBOX ===== */
 .inbox-panel { position: fixed; top: 0; right: -440px; width: 420px; max-width: 92vw; bottom: 0; background: var(--bg-raised); border-left: 1px solid var(--border-strong); z-index: 150; transition: right 0.32s cubic-bezier(.2,.8,.2,1); display: flex; flex-direction: column; box-shadow: -30px 0 80px -40px rgba(0,0,0,0.9); }
@@ -554,6 +650,7 @@ button.msg-header, button.cc-divider, button.exec-label { width: 100%; }
 <div id="stage">
     <div id="net-pan"><svg id="network-svg" viewBox="0 0 580 300"></svg></div>
     <div class="net-stat" id="net-info">No data</div>
+    <div id="canvas-onboarding" class="canvas-onboarding" style="display:none"></div>
     <div class="zoom-controls">
         <button onclick="zoomBy(1/1.25)" title="Zoom out" aria-label="Zoom out">−</button>
         <button class="bare zoom-pct" id="zoom-pct" onclick="fitView()" title="Fit to view" aria-label="Zoom level - activate to fit view">100%</button>
@@ -1376,20 +1473,7 @@ function renderAgents() {
         return;
     }
     if (!names.length) {
-        el.innerHTML = `<div class="onboarding-tutorial">
-            <h3>${icon('compass', 14)} Get Started</h3>
-            <p>Welcome! Your swarm has no agents yet. You can build your team in two ways:</p>
-            <div class="onboarding-step">
-                <h4>${icon('compass', 12)} 1. Chat with the Architect</h4>
-                <p>Chat with the Architect to specify your requirements, and let it design and build your agent team automatically.</p>
-                <button class="btn btn-sm btn-success" style="width: 100%" onclick="openMaster()">${icon('compass', 12)} Chat with Architect</button>
-            </div>
-            <div class="onboarding-step">
-                <h4>${icon('plus', 12)} 2. Create Manually</h4>
-                <p>Create agents manually by clicking the <strong>+ Add</strong> button at the top of this panel to specify their roles and links.</p>
-                <button class="btn btn-sm btn-secondary" style="width: 100%" onclick="showAddAgent()">${icon('plus', 12)} Create Manually</button>
-            </div>
-        </div>`;
+        el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${icon('search', 26)}</div><div>No agents in this team</div></div>`;
         return;
     }
     el.innerHTML = names.map(n => {
@@ -1443,7 +1527,34 @@ function renderAgents() {
 function renderNetwork() {
     const svg = document.getElementById('network-svg');
     const names = Object.keys(agentData).sort();
-    if (!names.length) { svg.innerHTML = ''; svg.setAttribute('width', 1); svg.setAttribute('height', 1); document.getElementById('net-info').textContent = 'No agents'; _netSig = ''; return; }
+    const onboarding = document.getElementById('canvas-onboarding');
+    if (!currentTeam) {
+        if (onboarding) onboarding.style.display = 'none';
+        svg.innerHTML = ''; svg.setAttribute('width', 1); svg.setAttribute('height', 1); document.getElementById('net-info').textContent = 'No data'; _netSig = '';
+        return;
+    }
+    if (!names.length) {
+        svg.innerHTML = ''; svg.setAttribute('width', 1); svg.setAttribute('height', 1); document.getElementById('net-info').textContent = 'No agents'; _netSig = '';
+        if (onboarding) {
+            onboarding.innerHTML = `<div style="position:relative">
+                <h2>${icon('compass', 16)} Welcome to Hermes Swarm</h2>
+                <p class="subtitle">This team currently has no agents. Follow the options below to get started:</p>
+                <div class="onboarding-option architect">
+                    <h3>${icon('compass', 13)} Option 1: Chat with the Architect</h3>
+                    <p>Tell the Architect what kind of workflow or task you want to execute. It will automatically design roles, specify capabilities, and link the agent team for you.</p>
+                    <button class="btn btn-sm btn-success" onclick="openMaster()">${icon('compass', 12)} Chat with Architect</button>
+                </div>
+                <div class="onboarding-option">
+                    <h3>${icon('settings', 13)} Option 2: Create Agents Manually</h3>
+                    <p>Build your swarm manually by defining agents individually. Click the "+ Add" button in the Agents panel to assign roles and souls.</p>
+                    <button class="btn btn-sm btn-secondary" onclick="showAddAgent()">${icon('plus', 12)} Create Manually</button>
+                </div>
+            </div>`;
+            onboarding.style.display = 'block';
+        }
+        return;
+    }
+    if (onboarding) onboarding.style.display = 'none';
 
     const isSup = n => !!agentData[n]?.config?.is_supervisor;
     const peersOf = n => new Set(agentData[n]?.config?.allowed_peers || []);
