@@ -1,6 +1,6 @@
 # Hermes Swarm — self-contained image (Python + Hermes + Chromium + dashboard).
 # Uses Debian Bookworm (stable) to avoid repo signature issues with Trixie.
-FROM python:3.12-bookworm-slim
+FROM python:3.12-slim-bookworm
 
 # System deps: git for VCS, curl for healthchecks, Chromium deps for browser tools.
 # Pre-install the libraries Playwright/Chromium needs so the build is resilient
