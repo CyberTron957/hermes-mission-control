@@ -42,11 +42,23 @@ def add_pending_question(
     """
     from swarm_server.config import MAX_PENDING_QUESTIONS
 
+    # Resolve the asking agent's team so the inbox can show WHICH team a request
+    # belongs to — agent names can collide across teams, so the team is what
+    # disambiguates them. Best-effort: a missing config/agent leaves it blank.
+    team_id = ""
+    try:
+        from swarm_server.config import load_agents_config
+
+        team_id = load_agents_config()["agents"].get(agent_name, {}).get("team_id", "") or ""
+    except Exception:
+        pass
+
     qid = str(uuid.uuid4())
     with _pending_lock:
         _pending_human_questions[qid] = {
             "id": qid,
             "agent_name": agent_name,
+            "team_id": team_id,
             "question": question,
             "timestamp": time.time(),
             "status": "pending",

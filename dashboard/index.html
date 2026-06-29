@@ -412,6 +412,7 @@ button.msg-header, button.cc-divider, button.exec-label { width: 100%; }
 .inbox-item.answered { opacity: 0.65; }
 .inbox-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; font-size: 11px; color: var(--text-muted); }
 .inbox-item-agent { font-weight: 600; color: var(--text); font-size: 12px; }
+.inbox-item-team { display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: var(--r-sm); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; vertical-align: middle; }
 .inbox-item-status { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 7px; border-radius: var(--r-sm); background: var(--bg-input); border: 1px solid var(--border); }
 .inbox-item-question { font-size: 12.5px; line-height: 1.6; margin-bottom: 9px; color: var(--text); word-break: break-word; }
 .inbox-item-response { font-size: 11px; margin-top: 7px; padding: 8px; background: rgba(62,207,142,0.08); border-radius: var(--r-sm); color: var(--text); word-break: break-word; }
@@ -3431,6 +3432,17 @@ async function loadInbox() {
     } catch (e) { console.error('[Inbox] load failed:', e); }
 }
 
+// Friendly team label for an inbox item: prefer the team_id the backend stamped
+// on the question (works even for teams other than the one selected), map it to
+// the team's display name when known, and fall back to the raw id. Blank when no
+// team is resolvable so the chip is simply omitted.
+function inboxTeamLabel(q) {
+    const teamId = q.team_id || agentData[q.agent_name]?.config?.team_id || '';
+    if (!teamId) return '';
+    const t = teamsCache.find(x => x.id === teamId);
+    return t ? t.name : teamId;
+}
+
 function renderInbox() {
     const body = document.getElementById('inbox-body');
     // Client-side notices always render LAST (bottom of the inbox).
@@ -3479,9 +3491,11 @@ function renderInbox() {
         if (q.response) {
             responseHtml = `<div class="inbox-item-response"><strong>Response:</strong><div class="md" style="margin-top:4px">${mdToHtml(q.response)}</div></div>`;
         }
+        const teamName = inboxTeamLabel(q);
+        const teamChip = teamName ? `<span class="inbox-item-team">${esc(teamName)}</span>` : '';
         let actionHtml = '';
         if (q.status === 'pending') {
-            const teamId = agentData[q.agent_name]?.config?.team_id || currentTeam;
+            const teamId = q.team_id || agentData[q.agent_name]?.config?.team_id || currentTeam;
             const browserBtn = q.kind === 'takeover'
                 ? `<button class="btn btn-sm" onclick="openBrowserPanel('${jsAttr(teamId)}', {qid:'${jsAttr(q.id)}', agent:'${jsAttr(q.agent_name)}'})">${icon('globe', 11)} Open browser</button>`
                 : '';
@@ -3490,7 +3504,7 @@ function renderInbox() {
         return `
             <div class="inbox-item ${statusClass}">
                 <div class="inbox-item-header">
-                    <span class="inbox-item-agent">${esc(agentData[q.agent_name]?.config?.name || q.agent_name)}</span>
+                    <span class="inbox-item-agent">${teamChip}${esc(agentData[q.agent_name]?.config?.name || q.agent_name)}</span>
                     <span class="inbox-item-status">${statusLabel} &middot; ${ts}</span>
                 </div>
                 <div class="inbox-item-question md">${mdToHtml(q.question)}</div>
@@ -3721,7 +3735,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Dismiss modals by clicking the backdrop or pressing Escape; trap Tab
     // inside the open dialog so keyboard focus can't escape behind the backdrop.
     document.querySelectorAll('.modal-bg').forEach(bg => {
-        bg.addEventListener('click', e => { if (e.target === bg) hideModal(bg.id); });
+        // Close on a backdrop click only when the press also STARTED on the
+        // backdrop. A drag that begins inside the dialog (e.g. dragging the
+        // textarea resize handle) and releases over the backdrop fires a click
+        // whose target is the backdrop — without this guard that would dismiss
+        // the modal mid-resize and lose whatever was being typed.
+        let pressedOnBg = false;
+        bg.addEventListener('mousedown', e => { pressedOnBg = (e.target === bg); });
+        bg.addEventListener('click', e => { if (e.target === bg && pressedOnBg) hideModal(bg.id); });
         bg.addEventListener('keydown', e => {
             if (e.key !== 'Tab') return;
             const f = [...bg.querySelectorAll('input:not([type=hidden]):not([disabled]), select, textarea, button:not([disabled])')]
