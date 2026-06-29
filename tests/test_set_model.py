@@ -10,8 +10,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import swarm_server.model_config as mc          # noqa: E402
-from swarm_server.cli import cmd_set_model       # noqa: E402
+import teams_server.model_config as mc          # noqa: E402
+from teams_server.cli import cmd_set_model       # noqa: E402
 
 
 def _args(**kw):

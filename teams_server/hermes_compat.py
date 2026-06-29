@@ -1,9 +1,9 @@
 """Hermes compatibility self-check.
 
-The swarm is built OVER Hermes and *wants* to ride Hermes' constant updates —
+The teams is built OVER Hermes and *wants* to ride Hermes' constant updates —
 so we deliberately do NOT pin an upper version bound. The price of that freedom
 is that a few load-bearing features reach into Hermes' internal/underscore APIs,
-and several swarm config lists mirror names Hermes owns. If a Hermes update moves
+and several teams config lists mirror names Hermes owns. If a Hermes update moves
 one of those, today it degrades SILENTLY (every reach-in is wrapped in
 ``try/except``).
 
@@ -11,7 +11,7 @@ This module turns silent drift into a LOUD signal: it probes each fragile seam
 against the *installed* Hermes and reports which ones still hold. Run at server
 startup (warn-only — never blocks boot) and surfaced by ``agent-teams doctor``.
 
-Add a probe here whenever the swarm starts depending on a new Hermes internal,
+Add a probe here whenever the teams starts depending on a new Hermes internal,
 so "did this Hermes release break us?" is answerable in one place.
 """
 
@@ -23,7 +23,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 
-log = logging.getLogger("swarm.compat")
+log = logging.getLogger("teams.compat")
 
 
 # --------------------------------------------------------------------------- #
@@ -110,7 +110,7 @@ def _probe_provider_registry():
 
 
 def _probe_aiagent_tool_injection():
-    # agent.py injects swarm tools by mutating an AIAgent's `.tools` /
+    # agent.py injects teams tools by mutating an AIAgent's `.tools` /
     # `.valid_tool_names` / `._tool_use_enforcement` after construction. Hermes
     # sets these during agent init (agent/agent_init.py), not in AIAgent.__init__,
     # so source-scan that module for the assignments — a rename surfaces loudly.
@@ -146,7 +146,7 @@ def _probe_disabled_toolsets():
     # becomes a dead no-op (and a brand-new heavyweight toolset ships enabled).
     try:
         from toolsets import get_all_toolsets
-        from swarm_server.config import DISABLED_TOOLSETS
+        from teams_server.config import DISABLED_TOOLSETS
         known = set(get_all_toolsets().keys())
     except Exception as e:
         return False, f"toolset registry unavailable: {e}"
@@ -218,7 +218,7 @@ def log_self_check(report: Optional[CompatReport] = None) -> CompatReport:
         log.warning("  [%s] %s: %s", tag, p.name, p.detail)
     if crit:
         log.warning("  → %d CRITICAL seam(s) broke: a Hermes update likely moved an "
-                    "internal API the swarm depends on. Features above may silently "
-                    "fail until reconciled. See swarm_server/hermes_compat.py.", len(crit))
+                    "internal API the teams depends on. Features above may silently "
+                    "fail until reconciled. See teams_server/hermes_compat.py.", len(crit))
     log.warning("%s", bar)
     return report

@@ -16,7 +16,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from swarm_server.prompts import (  # noqa: E402
+from teams_server.prompts import (  # noqa: E402
     TOOL_RESULT_ELIDED_PREFIX,
     age_stale_tool_results,
 )

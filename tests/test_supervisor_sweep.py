@@ -31,13 +31,13 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import swarm_server.agent as agent_mod  # noqa: E402
-from swarm_server.agent import (  # noqa: E402
+import teams_server.agent as agent_mod  # noqa: E402
+from teams_server.agent import (  # noqa: E402
     AgentDaemon,
     compose_sweep_sections,
     _age_short,
 )
-from swarm_server.prompts import SUPERVISOR_SWEEP_PROMPT  # noqa: E402
+from teams_server.prompts import SUPERVISOR_SWEEP_PROMPT  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ def make_supervisor(peers, interval_minutes=None, state="idle", pending=0,
 @pytest.fixture()
 def no_registry(monkeypatch):
     """Peers have no live daemons → state '?', 0 queued; and no human inbox."""
-    import swarm_server.tools as tools_mod
+    import teams_server.tools as tools_mod
 
     monkeypatch.setattr(tools_mod, "_daemon_registry", {}, raising=False)
     monkeypatch.setattr(agent_mod, "_daemon_registry", {}, raising=False)
@@ -221,7 +221,7 @@ def test_first_seen_peer_anchors_to_now_not_history(monkeypatch, no_registry):
 
 
 def test_mid_turn_busy_marker(monkeypatch, no_registry):
-    import swarm_server.tools as tools_mod
+    import teams_server.tools as tools_mod
 
     db = FakeDB({"a": [msg(1, "partial work so far")]})
     monkeypatch.setattr(agent_mod, "monitor_db", db)
@@ -271,7 +271,7 @@ def test_sections_floor_prevents_starvation():
 # ---------------------------------------------------------------------------
 
 def test_ledger_scopes_delegations_and_questions(monkeypatch, no_registry):
-    import swarm_server.tools as tools_mod
+    import teams_server.tools as tools_mod
 
     now = time.time()
     db = FakeDB(open_delegations=[

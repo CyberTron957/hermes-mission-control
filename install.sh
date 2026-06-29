@@ -2,7 +2,7 @@
 #
 # Agent Teams — one-command installer.
 #
-# Checks your machine, installs the swarm the best local way, and gets a
+# Checks your machine, installs the teams the best local way, and gets a
 # provider configured — adopting an existing Hermes (~/.hermes) if you have one,
 # otherwise launching `hermes setup` (which also covers custom / OpenAI-compatible
 # endpoints). Idempotent: safe to re-run.
@@ -15,7 +15,7 @@
 # Works two ways:
 #   • from a clone:   bash install.sh
 #   • from the web:   bash <(curl -fsSL <raw-url>/install.sh)     # clones first
-# When run from the web it clones into ./agent-teams (override: HERMES_SWARM_DIR).
+# When run from the web it clones into ./agent-teams (override: AGENT_TEAMS_DIR).
 #
 # Usage:
 #   bash install.sh [--no-run] [--no-setup] [--no-browser] [--yes]
@@ -26,9 +26,9 @@
 #     --help, -h    show this help
 #
 # Hands-free provider config (AI-agent / CI installs) — set before running:
-#   SWARM_SETUP_MODEL=deepseek-chat  SWARM_SETUP_BASE_URL=http://localhost:4000/v1
-#   SWARM_SETUP_PROVIDER=custom      SWARM_SETUP_API_KEY=sk-...
-#   (only SWARM_SETUP_MODEL is required; the installer then skips the interactive wizard)
+#   TEAMS_SETUP_MODEL=deepseek-chat  TEAMS_SETUP_BASE_URL=http://localhost:4000/v1
+#   TEAMS_SETUP_PROVIDER=custom      TEAMS_SETUP_API_KEY=sk-...
+#   (only TEAMS_SETUP_MODEL is required; the installer then skips the interactive wizard)
 #
 # Prefer containers? Use Docker instead:  docker compose up --build
 #
@@ -127,7 +127,7 @@ ensure_py_venv() {
 # ---- Locate or fetch the repo --------------------------------------------
 # Run from a checkout → use it. Piped from the web (no checkout) → clone first,
 # then continue from inside the clone.
-REPO_URL="${HERMES_SWARM_REPO:-https://github.com/CyberTron957/hermes-mission-control.git}"
+REPO_URL="${AGENT_TEAMS_REPO:-https://github.com/CyberTron957/agent-teams.git}"
 _in_repo() { [ -f "$1/pyproject.toml" ] && grep -q 'name *= *"agent-teams"' "$1/pyproject.toml" 2>/dev/null; }
 
 _self_dir=""
@@ -139,7 +139,7 @@ elif _in_repo "$PWD"; then
 else
   ensure_git                                        # auto-installs git on a fresh machine
   ensure_curl                                       # auto-installs curl on a fresh machine
-  TARGET="${HERMES_SWARM_DIR:-$PWD/agent-teams}"
+  TARGET="${AGENT_TEAMS_DIR:-$PWD/agent-teams}"
   if _in_repo "$TARGET"; then
     step "Updating existing clone at $TARGET"
     git -C "$TARGET" pull --ff-only 2>/dev/null || warn "couldn't fast-forward; using the existing clone."
@@ -214,7 +214,7 @@ info "hermes-agent $HV installed."
 # ---- 4. browser for the publishing tools ---------------------------------
 if [ "$NO_BROWSER" -eq 0 ]; then
   step "Browser (for the browser/publishing tools)"
-  if "$PY" -c 'import sys; from swarm_server.browser_pool import _find_browser; sys.exit(0 if _find_browser() else 1)' 2>/dev/null; then
+  if "$PY" -c 'import sys; from teams_server.browser_pool import _find_browser; sys.exit(0 if _find_browser() else 1)' 2>/dev/null; then
     info "Found a usable Chrome/Chromium — skipping the download."
   else
     # Try installing system Chromium first (fastest, no download needed)
@@ -254,21 +254,21 @@ fi
 
 # ---- 5. provider / model (adopt existing, else set up) -------------------
 step "Provider / model"
-is_configured() { "$PY" -c 'import sys; from swarm_server.model_config import is_model_configured; sys.exit(0 if is_model_configured() else 1)' 2>/dev/null; }
-if [ -n "${SWARM_SETUP_MODEL:-}" ]; then
+is_configured() { "$PY" -c 'import sys; from teams_server.model_config import is_model_configured; sys.exit(0 if is_model_configured() else 1)' 2>/dev/null; }
+if [ -n "${TEAMS_SETUP_MODEL:-}" ]; then
   # Non-interactive config for AI-agent / CI / headless installs. Set:
-  #   SWARM_SETUP_MODEL=...  [SWARM_SETUP_PROVIDER=...]  [SWARM_SETUP_BASE_URL=...]  [SWARM_SETUP_API_KEY=...]
-  info "Configuring provider from SWARM_SETUP_* env (non-interactive)…"
+  #   TEAMS_SETUP_MODEL=...  [TEAMS_SETUP_PROVIDER=...]  [TEAMS_SETUP_BASE_URL=...]  [TEAMS_SETUP_API_KEY=...]
+  info "Configuring provider from TEAMS_SETUP_* env (non-interactive)…"
   "$VENV/bin/agent-teams" set-model \
-    ${SWARM_SETUP_PROVIDER:+--provider "$SWARM_SETUP_PROVIDER"} \
-    --model "$SWARM_SETUP_MODEL" \
-    ${SWARM_SETUP_BASE_URL:+--base-url "$SWARM_SETUP_BASE_URL"} \
-    ${SWARM_SETUP_API_KEY:+--api-key "$SWARM_SETUP_API_KEY"} \
+    ${TEAMS_SETUP_PROVIDER:+--provider "$TEAMS_SETUP_PROVIDER"} \
+    --model "$TEAMS_SETUP_MODEL" \
+    ${TEAMS_SETUP_BASE_URL:+--base-url "$TEAMS_SETUP_BASE_URL"} \
+    ${TEAMS_SETUP_API_KEY:+--api-key "$TEAMS_SETUP_API_KEY"} \
     || warn "set-model failed — configure later with: $VENV/bin/agent-teams set-model --help"
 elif is_configured; then
   # Detect WHICH home already has a model so the message is honest about what we
-  # adopted (a personal `hermes setup` in ~/.hermes, or a prior swarm default).
-  _src="$("$PY" -c 'from swarm_server.model_config import get_default_model, detect_global_hermes_model as g; import sys; sys.stdout.write("swarm default (data/.hermes-shared)" if get_default_model().get("model") else ("your existing ~/.hermes setup" if g().get("model") else "?"))' 2>/dev/null || echo '?')"
+  # adopted (a personal `hermes setup` in ~/.hermes, or a prior teams default).
+  _src="$("$PY" -c 'from teams_server.model_config import get_default_model, detect_global_hermes_model as g; import sys; sys.stdout.write("teams default (data/.hermes-shared)" if get_default_model().get("model") else ("your existing ~/.hermes setup" if g().get("model") else "?"))' 2>/dev/null || echo '?')"
   info "Provider already configured — adopting $_src. Nothing to do."
   info "(Reconfigure or add tool keys anytime with: $VENV/bin/agent-teams setup)"
 elif [ "$NO_SETUP" -eq 1 ] || [ "$ASSUME_YES" -eq 1 ] || [ ! -t 0 ]; then
@@ -329,7 +329,7 @@ cat << "EOF"
 
 EOF
 printf "%s" "$X"
-step "Done — your swarm is installed in $PWD"
+step "Done — your teams is installed in $PWD"
 info "(If commands are not found yet in this terminal, run 'source ~/.bashrc' or use the full path: $START_CMD)"
 if [ "$NO_RUN" -eq 0 ] && [ "$ASSUME_YES" -eq 0 ] && [ -t 0 ]; then
   printf '\n    Start it now? [Y/n] '

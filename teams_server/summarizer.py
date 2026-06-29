@@ -1,6 +1,6 @@
 """Out-of-band agent activity summarizer (Layer 3 observability).
 
-A cheap, swarm-global model reads each agent's *recorded* transcript from
+A cheap, teams-global model reads each agent's *recorded* transcript from
 monitoring.db and writes a short rolling status digest, so an operator running
 10+ agents reads digests instead of millions of tokens of chat.
 
@@ -25,15 +25,15 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from swarm_server.config import (
+from teams_server.config import (
     DIGEST_INPUT_CHAR_CAP,
     DIGEST_MAX_AGE_SECONDS,
     DIGEST_MIN_NEW_TOKENS,
     get_global_settings,
 )
-from swarm_server.monitoring import monitor_db
+from teams_server.monitoring import monitor_db
 
-log = logging.getLogger("swarm.summarizer")
+log = logging.getLogger("teams.summarizer")
 
 RISK_LEVELS = ("ok", "watch", "stuck", "error")
 
@@ -61,14 +61,14 @@ _SYSTEM_PROMPT = (
 
 def _resolve_summary_target() -> Dict[str, str]:
     """Effective {model, base_url, api_key} for the digest model. Model is the
-    UI-configurable global setting (falling back to the swarm default model); the
+    UI-configurable global setting (falling back to the teams default model); the
     endpoint is the resolved default backend. The digest is a direct
     OpenAI-compatible call, so it only runs when the default model is a custom /
     OpenAI-compatible endpoint (base_url present); native providers (anthropic/…)
     have no base_url here and the digest is skipped — see _call_llm."""
     settings = get_global_settings()
     try:
-        from swarm_server.model_config import get_default_model
+        from teams_server.model_config import get_default_model
 
         dm = get_default_model() or {}
     except Exception:
@@ -239,7 +239,7 @@ def summarize_agent(
         "model": target["model"],
     }
     try:
-        from swarm_server.websocket import _broadcast
+        from teams_server.websocket import _broadcast
 
         _broadcast("digest_updated", {
             "agent_name": agent_name, "team_id": team_id,
@@ -271,7 +271,7 @@ def maybe_rollup_decisions(team_id: str) -> Optional[dict]:
     Keeps the most recent DECISION_LIVE_WINDOW decisions live (un-rolled) and only
     acts once at least DECISION_ROLLUP_TRIGGER have accumulated beyond the last
     milestone."""
-    from swarm_server.config import DECISION_LIVE_WINDOW, DECISION_ROLLUP_TRIGGER
+    from teams_server.config import DECISION_LIVE_WINDOW, DECISION_ROLLUP_TRIGGER
 
     last = monitor_db.get_latest_milestone(team_id)
     after_id = int((last or {}).get("covers_to_decision") or 0)

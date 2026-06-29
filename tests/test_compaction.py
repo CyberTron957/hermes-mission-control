@@ -2,7 +2,7 @@
 """
 Compaction validation
 ======================
-Proves the auto-compaction wiring actually fires and that the swarm-side
+Proves the auto-compaction wiring actually fires and that the teams-side
 rotation handling is correct. Earlier this feature was untested: real runs
 never grew a session past the threshold, so we never observed a rotation.
 
@@ -26,7 +26,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Make the swarm package + Hermes importable when run as a script.
+# Make the teams package + Hermes importable when run as a script.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 HERMES_PATH = os.environ.get("HERMES_AGENT_PATH", os.path.expanduser("~/.hermes/hermes-agent"))
@@ -53,7 +53,7 @@ def check(name, cond, detail=""):
 def test_config():
     print("\n[1] CONFIG: write_agent_hermes_config")
     import yaml
-    from swarm_server.config import (
+    from teams_server.config import (
         write_agent_hermes_config,
         AGENT_CONTEXT_WINDOW,
         COMPRESSION_THRESHOLD,
@@ -62,7 +62,7 @@ def test_config():
 
     with tempfile.TemporaryDirectory() as d:
         home = Path(d)
-        # Custom / OpenAI-compatible endpoint route: the swarm pins the window +
+        # Custom / OpenAI-compatible endpoint route: the teams pins the window +
         # aux because the real model is hidden behind the base_url.
         write_agent_hermes_config(home, provider="custom",
                                   base_url="https://api.example.com/v1")
@@ -99,7 +99,7 @@ def test_trigger():
     print("\n[2] TRIGGER: should_compress() at the configured threshold")
     from agent.context_compressor import ContextCompressor
     from agent.model_metadata import estimate_messages_tokens_rough
-    from swarm_server.config import (
+    from teams_server.config import (
         AGENT_CONTEXT_WINDOW,
         COMPRESSION_THRESHOLD,
         COMPRESSION_PROTECT_FIRST_N,
@@ -145,13 +145,13 @@ def test_trigger():
 
 
 # ---------------------------------------------------------------------------
-# 3. ROTATION — the swarm persists a rotated session_id (compaction aftermath)
+# 3. ROTATION — the teams persists a rotated session_id (compaction aftermath)
 # ---------------------------------------------------------------------------
 def test_rotation_persist():
     print("\n[3] ROTATION: _persist_session_id_if_rotated")
     # Heavy imports (FastAPI/Hermes) live inside agent.py; importing it is fine.
-    from swarm_server import agent as agent_mod
-    from swarm_server.agent import AgentDaemon
+    from teams_server import agent as agent_mod
+    from teams_server.agent import AgentDaemon
 
     # Capture the config that would be persisted instead of touching disk.
     saved = {}

@@ -1,14 +1,14 @@
-"""Entry point: python -m swarm_server"""
+"""Entry point: python -m teams_server"""
 
 import logging
 
 import uvicorn
 
-from swarm_server.config import SERVER_HOST, SERVER_PORT, configure_logging
+from teams_server.config import SERVER_HOST, SERVER_PORT, configure_logging
 
 configure_logging()
 
-log = logging.getLogger("swarm")
+log = logging.getLogger("teams")
 
 if __name__ == "__main__":
     log.info("=" * 60)
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     log.info("  Dashboard:  http://%s:%s/", SERVER_HOST, SERVER_PORT)
     log.info("=" * 60)
     uvicorn.run(
-        "swarm_server.server:app",
+        "teams_server.server:app",
         host=SERVER_HOST,
         port=SERVER_PORT,
         log_level="info",

@@ -24,15 +24,15 @@ dependencies = [
     "pydantic",
     "aiosqlite",
     "ddgs",
-    # The agent runtime each swarm member runs. [all] pulls the browser/web/file
-    # toolsets the swarm relies on. Pinned to the floor that has the interrupt()
+    # The agent runtime each teams member runs. [all] pulls the browser/web/file
+    # toolsets the teams relies on. Pinned to the floor that has the interrupt()
     # API + the progress callbacks the live-execution view uses.
     "hermes-agent[all]>=0.15.2",
 ]
 
 [project.optional-dependencies]
 # JS-rendering web fetch for the zero-config web_extract fallback (see
-# swarm_server/web_crawl4ai.py). Without it, the fallback still works via httpx
+# teams_server/web_crawl4ai.py). Without it, the fallback still works via httpx
 # (a core dep) — fine for server-rendered pages, but single-page apps that need
 # a real browser to paint their content come back empty. Install with
 # `pip install agent-teams[web]` and run `playwright install chromium`. Only
@@ -41,15 +41,15 @@ dependencies = [
 web = ["crawl4ai"]
 
 [project.scripts]
-agent-teams = "swarm_server.cli:main"
+agent-teams = "teams_server.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/CyberTron957/hermes-mission-control"
-Repository = "https://github.com/CyberTron957/hermes-mission-control"
-Issues = "https://github.com/CyberTron957/hermes-mission-control/issues"
+Homepage = "https://github.com/CyberTron957/agent-teams"
+Repository = "https://github.com/CyberTron957/agent-teams"
+Issues = "https://github.com/CyberTron957/agent-teams/issues"
 
 [tool.setuptools]
-packages = ["swarm_server"]
+packages = ["teams_server"]
 
 # Ship the static dashboard. Resolved at runtime by config._resolve_dashboard_dir
 # (it probes this share/ location for pip installs).

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for the Architect (master team-builder) — swarm_server/master.py.
+"""Unit tests for the Architect (master team-builder) — teams_server/master.py.
 
 No LLM and no Hermes AIAgent: we exercise the tool handlers directly against a
 real (but temp-rooted) config + workspace, plus the chat-log persistence and the
@@ -18,8 +18,8 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import swarm_server.config as cfg_mod  # noqa: E402
-import swarm_server.master as master  # noqa: E402
+import teams_server.config as cfg_mod  # noqa: E402
+import teams_server.master as master  # noqa: E402
 
 MASTER_KW = {"task_id": "master.id:master"}  # parsed by _caller → "master"
 # The real caller convention is task_id="agent_name:master".
@@ -28,8 +28,8 @@ NOT_MASTER = {"task_id": "agent_name:founder2"}
 
 
 @pytest.fixture()
-def swarm(tmp_path, monkeypatch):
-    """Point the config module at a throwaway data root and seed an empty swarm."""
+def teams(tmp_path, monkeypatch):
+    """Point the config module at a throwaway data root and seed an empty teams."""
     data = tmp_path / "data"
     data.mkdir()
     monkeypatch.setattr(cfg_mod, "DATA_ROOT", data)
@@ -50,7 +50,7 @@ def _call(handler, args, kw=None):
 # ---------------------------------------------------------------------------
 # Caller guard
 # ---------------------------------------------------------------------------
-def test_non_master_caller_is_rejected(swarm):
+def test_non_master_caller_is_rejected(teams):
     for handler in (
         master._master_overview_handler,
         master._master_create_team_handler,
@@ -61,7 +61,7 @@ def test_non_master_caller_is_rejected(swarm):
         assert "Architect" in r["error"]
 
 
-def test_unknown_caller_rejected(swarm):
+def test_unknown_caller_rejected(teams):
     r = json.loads(master._master_overview_handler({}, task_id="nope"))
     assert r["success"] is False
 
@@ -69,7 +69,7 @@ def test_unknown_caller_rejected(swarm):
 # ---------------------------------------------------------------------------
 # Build flow: team → agents → links → files
 # ---------------------------------------------------------------------------
-def test_full_build_flow(swarm):
+def test_full_build_flow(teams):
     # Create a team.
     r = _call(master._master_create_team_handler, {"team_id": "acme", "name": "Acme Co"})
     assert r["success"] and r["team_id"] == "acme"
@@ -116,7 +116,7 @@ def test_full_build_flow(swarm):
     assert "bogus_key" not in r["config"]
 
 
-def test_overview_and_get_team(swarm):
+def test_overview_and_get_team(teams):
     _call(master._master_create_team_handler, {"team_id": "acme", "name": "Acme"})
     _call(master._master_create_agent_handler, {
         "team_id": "acme", "agent_name": "lead", "display_name": "Lead",
@@ -139,7 +139,7 @@ def test_overview_and_get_team(swarm):
 # ---------------------------------------------------------------------------
 # Structural guard: every team must have exactly one supervisor
 # ---------------------------------------------------------------------------
-def test_get_team_warns_when_no_supervisor(swarm):
+def test_get_team_warns_when_no_supervisor(teams):
     _call(master._master_create_team_handler, {"team_id": "acme", "name": "Acme"})
     _call(master._master_create_agent_handler, {
         "team_id": "acme", "agent_name": "lead", "display_name": "Lead",
@@ -151,7 +151,7 @@ def test_get_team_warns_when_no_supervisor(swarm):
     assert "supervisor" in gt["warnings"][0].lower()
 
 
-def test_get_team_no_warning_with_one_supervisor(swarm):
+def test_get_team_no_warning_with_one_supervisor(teams):
     _call(master._master_create_team_handler, {"team_id": "acme", "name": "Acme"})
     _call(master._master_create_agent_handler, {
         "team_id": "acme", "agent_name": "lead", "display_name": "Lead",
@@ -166,7 +166,7 @@ def test_get_team_no_warning_with_one_supervisor(swarm):
     assert gt["warnings"] == []
 
 
-def test_get_team_warns_on_multiple_supervisors(swarm):
+def test_get_team_warns_on_multiple_supervisors(teams):
     _call(master._master_create_team_handler, {"team_id": "acme", "name": "Acme"})
     for nm in ("boss1", "boss2"):
         _call(master._master_create_agent_handler, {
@@ -180,7 +180,7 @@ def test_get_team_warns_on_multiple_supervisors(swarm):
 # ---------------------------------------------------------------------------
 # Files: write / read / list + path safety
 # ---------------------------------------------------------------------------
-def test_file_write_read_list(swarm):
+def test_file_write_read_list(teams):
     _call(master._master_create_team_handler, {"team_id": "acme", "name": "Acme"})
     r = _call(master._master_write_file_handler, {
         "team_id": "acme", "area": "workspace", "path": "workspace.md",
@@ -201,7 +201,7 @@ def test_file_write_read_list(swarm):
     assert "workspace.md" in r["files"]
 
 
-def test_path_traversal_rejected(swarm):
+def test_path_traversal_rejected(teams):
     _call(master._master_create_team_handler, {"team_id": "acme", "name": "Acme"})
     r = _call(master._master_write_file_handler, {
         "team_id": "acme", "area": "workspace", "path": "../escape.txt", "content": "x",
@@ -209,7 +209,7 @@ def test_path_traversal_rejected(swarm):
     assert r["success"] is False and ".." in r["error"]
 
 
-def test_bad_area_and_missing_team_rejected(swarm):
+def test_bad_area_and_missing_team_rejected(teams):
     _call(master._master_create_team_handler, {"team_id": "acme", "name": "Acme"})
     r = _call(master._master_write_file_handler, {
         "team_id": "acme", "area": "secrets", "path": "x", "content": "x",
@@ -221,7 +221,7 @@ def test_bad_area_and_missing_team_rejected(swarm):
     assert r["success"] is False
 
 
-def test_write_file_size_cap(swarm):
+def test_write_file_size_cap(teams):
     _call(master._master_create_team_handler, {"team_id": "acme", "name": "Acme"})
     r = _call(master._master_write_file_handler, {
         "team_id": "acme", "area": "workspace", "path": "big.txt",
@@ -233,7 +233,7 @@ def test_write_file_size_cap(swarm):
 # ---------------------------------------------------------------------------
 # Destructive ops require explicit confirmation
 # ---------------------------------------------------------------------------
-def test_delete_requires_confirm(swarm):
+def test_delete_requires_confirm(teams):
     _call(master._master_create_team_handler, {"team_id": "acme", "name": "Acme"})
     _call(master._master_create_agent_handler, {
         "team_id": "acme", "agent_name": "lead", "display_name": "Lead",
@@ -249,7 +249,7 @@ def test_delete_requires_confirm(swarm):
     assert "acme" in cfg_mod.load_agents_config()["teams"]
 
 
-def test_delete_with_confirm_succeeds_without_hooks(swarm):
+def test_delete_with_confirm_succeeds_without_hooks(teams):
     # Hooks are unset in tests, so despawn is a no-op — but config-level deletion
     # for delete_team still happens inside the (unwired) hook on the server side.
     # Here we only assert the handler accepts confirm=true and reports success.
@@ -261,7 +261,7 @@ def test_delete_with_confirm_succeeds_without_hooks(swarm):
 # ---------------------------------------------------------------------------
 # send_task: no daemon → graceful error
 # ---------------------------------------------------------------------------
-def test_send_task_without_daemon(swarm):
+def test_send_task_without_daemon(teams):
     _call(master._master_create_team_handler, {"team_id": "acme", "name": "Acme"})
     _call(master._master_create_agent_handler, {
         "team_id": "acme", "agent_name": "lead", "display_name": "Lead", "role_soul": "x",
@@ -273,7 +273,7 @@ def test_send_task_without_daemon(swarm):
 # ---------------------------------------------------------------------------
 # Chat-log persistence + soul content
 # ---------------------------------------------------------------------------
-def test_chat_log_roundtrip(swarm):
+def test_chat_log_roundtrip(teams):
     m = master.MasterAgent()
     m._append_log("user", "hi")
     m._append_log("assistant", "hello, what do you want to build?")
@@ -282,7 +282,7 @@ def test_chat_log_roundtrip(swarm):
     assert hist[1]["content"].startswith("hello")
 
 
-def test_reset_starts_new_session(swarm):
+def test_reset_starts_new_session(teams):
     m = master.MasterAgent()
     first = m._session_id
     m.reset()
@@ -304,10 +304,10 @@ def test_soul_has_key_sections():
 
 
 def test_architect_gets_web_toolset_only():
-    # The Architect is wired with exactly swarm_master + web (no terminal/browser).
+    # The Architect is wired with exactly teams_master + web (no terminal/browser).
     import inspect
     src = inspect.getsource(master.MasterAgent._ensure_agent)
-    assert '"enabled_toolsets": ["swarm_master", "web"]' in src
+    assert '"enabled_toolsets": ["teams_master", "web"]' in src
 
 
 # ---------------------------------------------------------------------------
@@ -321,7 +321,7 @@ def _mk_team(team_id="t", members=("a", "b", "c")):
                              display_name=m.upper(), role_soul="x")
 
 
-def test_set_agent_peers_is_bidirectional(swarm):
+def test_set_agent_peers_is_bidirectional(teams):
     _mk_team()
     # Linking a→[b] must also put a into b's list.
     cfg_mod.set_agent_peers(cfg_mod.load_agents_config(), "a", ["b"])
@@ -337,13 +337,13 @@ def test_set_agent_peers_is_bidirectional(swarm):
     assert "a" not in cfg["agents"]["b"]["allowed_peers"]
 
 
-def test_set_agent_peers_rejects_self_link(swarm):
+def test_set_agent_peers_rejects_self_link(teams):
     _mk_team()
     with pytest.raises(ValueError):
         cfg_mod.set_agent_peers(cfg_mod.load_agents_config(), "a", ["a"])
 
 
-def test_peer_allowed_is_symmetric(swarm):
+def test_peer_allowed_is_symmetric(teams):
     _mk_team()
     # Manually store a one-directional link (legacy data): only a lists b.
     cfg = cfg_mod.load_agents_config()

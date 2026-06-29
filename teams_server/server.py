@@ -12,9 +12,9 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from swarm_server import __version__
-from swarm_server.agent import AgentDaemon
-from swarm_server.config import (
+from teams_server import __version__
+from teams_server.agent import AgentDaemon
+from teams_server.config import (
     AGENTS,
     CORS_ALLOWED_ORIGINS,
     DASHBOARD_DIR,
@@ -35,7 +35,7 @@ from swarm_server.config import (
     update_global_settings,
     SERVER_HOST,
     SERVER_PORT,
-    SWARM_API_KEY,
+    TEAMS_API_KEY,
     add_agent_cron,
     add_agent_peer,
     create_agent,
@@ -55,12 +55,12 @@ from swarm_server.config import (
     update_agent_cron,
     _derive_workspace_path,
 )
-from swarm_server.monitoring import monitor_db
-from swarm_server.tools import _daemon_registry
-from swarm_server.websocket import ws_broadcaster
-import swarm_server.websocket as _ws_mod
+from teams_server.monitoring import monitor_db
+from teams_server.tools import _daemon_registry
+from teams_server.websocket import ws_broadcaster
+import teams_server.websocket as _ws_mod
 
-log = logging.getLogger("swarm.server")
+log = logging.getLogger("teams.server")
 
 # ---------------------------------------------------------------------------
 # FastAPI App
@@ -94,7 +94,7 @@ async def _periodic_digest():
     event loop is never blocked. A small semaphore bounds concurrent summary
     calls so a big team can't fan out into a thundering herd on the cheap model.
     """
-    from swarm_server.summarizer import maybe_digest, maybe_rollup_decisions
+    from teams_server.summarizer import maybe_digest, maybe_rollup_decisions
 
     sem = asyncio.Semaphore(3)
 
@@ -131,11 +131,11 @@ async def _periodic_loop_detector():
     """Layer-5: scan each team's message graph for cross-agent loops / stalls and
     nudge to break them (see loop_detector.scan_team). Runs in a worker thread —
     the scan is pure SQLite reads + cheap string work, no LLM call."""
-    from swarm_server.config import LOOP_DETECT_ENABLED, LOOP_SWEEP_INTERVAL_SECONDS
+    from teams_server.config import LOOP_DETECT_ENABLED, LOOP_SWEEP_INTERVAL_SECONDS
     if not LOOP_DETECT_ENABLED:
         log.info("[LoopDetector] disabled")
         return
-    from swarm_server.loop_detector import scan_team
+    from teams_server.loop_detector import scan_team
 
     def _ingest(agent_name: str, from_agent: str, payload: str) -> None:
         d = daemons.get(agent_name)
@@ -170,11 +170,11 @@ async def lifespan(app: FastAPI):
     cfg = load_agents_config()
     loop = asyncio.get_running_loop()
 
-    # Verify the fragile Hermes seams the swarm depends on still hold in the
+    # Verify the fragile Hermes seams the teams depends on still hold in the
     # installed Hermes. Warn-only: a Hermes update that moved an internal API
     # should be LOUD here, never a silent feature regression nor a boot blocker.
     try:
-        from swarm_server.hermes_compat import log_self_check
+        from teams_server.hermes_compat import log_self_check
         log_self_check()
     except Exception as e:
         log.warning("[Startup] Hermes compat self-check failed to run: %s", e)
@@ -183,7 +183,7 @@ async def lifespan(app: FastAPI):
     # tool API keys (Firecrawl/Tavily/Exa/…) — into this process so every agent
     # can use them. Non-overriding, so explicit server/deployment env still wins.
     try:
-        from swarm_server.model_config import import_hermes_secrets
+        from teams_server.model_config import import_hermes_secrets
         import_hermes_secrets()
     except Exception as e:
         log.warning("[Startup] importing ~/.hermes secrets failed: %s", e)
@@ -192,7 +192,7 @@ async def lifespan(app: FastAPI):
     # start sweeping, so a mid-day restart resumes with the correct budget state
     # (a team already over its cap stays paused instead of getting a free reset).
     try:
-        from swarm_server.budget import budget_tracker
+        from teams_server.budget import budget_tracker
         budget_tracker.rebuild(monitor_db, cfg)
     except Exception as e:
         log.warning("[Startup] budget rebuild failed: %s", e)
@@ -201,7 +201,7 @@ async def lifespan(app: FastAPI):
         register_agent_daemon(agent_name, agent_cfg, loop)
 
     # Wire the Architect (master team-builder): register its toolset (so team
-    # agents' swarm_master deny-guard has something to deny) and inject the
+    # agents' teams_master deny-guard has something to deny) and inject the
     # thread-safe daemon lifecycle hooks it uses to spawn/despawn/update agents.
     _wire_master(loop)
 
@@ -209,7 +209,7 @@ async def lifespan(app: FastAPI):
     digest_task = loop.create_task(_periodic_digest())
     loopdet_task = loop.create_task(_periodic_loop_detector())
     try:
-        from swarm_server.model_config import resolve_model
+        from teams_server.model_config import resolve_model
 
         _eff = resolve_model({})
         log.info("[Startup] All agents running. Model: %s (source: %s)",
@@ -229,7 +229,7 @@ async def lifespan(app: FastAPI):
             _stop_daemon(daemon)
         # Stop per-team browsers (their on-disk profiles persist for next run).
         try:
-            from swarm_server.browser_pool import team_browser_manager
+            from teams_server.browser_pool import team_browser_manager
             team_browser_manager.shutdown_all()
         except Exception as e:
             log.warning("[Shutdown] team browser shutdown failed: %s", e)
@@ -267,20 +267,20 @@ def _request_key_ok(request: Request) -> bool:
     auth = request.headers.get("authorization", "")
     if not provided and auth.lower().startswith("bearer "):
         provided = auth[7:].strip()
-    return bool(provided) and secrets.compare_digest(provided, SWARM_API_KEY)
+    return bool(provided) and secrets.compare_digest(provided, TEAMS_API_KEY)
 
 
 @app.middleware("http")
 async def _auth_guard(request: Request, call_next):
     """Optional single-key auth on ALL endpoints.
 
-    Disabled unless SWARM_API_KEY is set (the server then assumes a trusted
+    Disabled unless TEAMS_API_KEY is set (the server then assumes a trusted
     localhost bind). When set, every request — reads included, since agent
     conversations and masked credentials are sensitive — needs the key, except
     the small AUTH_EXEMPT_PATHS allow-list. WebSockets are guarded separately by
     _ws_authenticate (HTTP middleware never sees WS scopes).
     """
-    if SWARM_API_KEY and request.url.path not in AUTH_EXEMPT_PATHS:
+    if TEAMS_API_KEY and request.url.path not in AUTH_EXEMPT_PATHS:
         if not _request_key_ok(request):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
     return await call_next(request)
@@ -292,13 +292,13 @@ async def _ws_authenticate(ws: WebSocket) -> bool:
     sent. Returns True iff the connection may proceed. Reused by every WS
     endpoint, including the browser-control stream. Sends nothing pre-auth."""
     await ws.accept()
-    if not SWARM_API_KEY:
+    if not TEAMS_API_KEY:
         return True
     try:
         raw = await asyncio.wait_for(ws.receive_text(), timeout=WS_AUTH_TIMEOUT_SECONDS)
         msg = json.loads(raw)
         key = str(msg.get("api_key", ""))
-        if msg.get("action") == "auth" and key and secrets.compare_digest(key, SWARM_API_KEY):
+        if msg.get("action") == "auth" and key and secrets.compare_digest(key, TEAMS_API_KEY):
             await ws.send_text(json.dumps({"type": "auth_ok", "payload": {}}))
             return True
     except Exception:
@@ -370,7 +370,7 @@ async def browser_stream_endpoint(ws: WebSocket, team_id: str):
             "payload": {"message": f"Unknown team '{team_id}'."}}))
         await ws.close()
         return
-    from swarm_server import browser_stream
+    from teams_server import browser_stream
     try:
         await browser_stream.relay(ws, team_id)
     except WebSocketDisconnect:
@@ -462,8 +462,8 @@ async def agent_digests(agent_name: str, limit: int = 50):
 
 @app.get("/settings")
 async def get_settings():
-    """Global swarm settings (e.g. the digest summary model + on/off)."""
-    from swarm_server.config import VISION_MODEL
+    """Global teams settings (e.g. the digest summary model + on/off)."""
+    from teams_server.config import VISION_MODEL
 
     out = dict(get_global_settings())
     # What "" falls back to — lets the UI show the real default as placeholder.
@@ -473,7 +473,7 @@ async def get_settings():
 
 @app.post("/settings")
 async def post_settings(request: Request):
-    """Patch global swarm settings. Recognized keys: summary_model,
+    """Patch global teams settings. Recognized keys: summary_model,
     digest_enabled, vision_model."""
     body = await request.json()
     fields = {}
@@ -500,12 +500,12 @@ async def post_settings(request: Request):
     # The Architect picks up a new master_model on its next turn.
     if "master_model" in fields:
         try:
-            from swarm_server.master import get_master
+            from teams_server.master import get_master
 
             get_master().reload()
         except Exception as e:  # noqa: BLE001
             log.warning("master reload failed: %s", e)
-    from swarm_server.websocket import _broadcast
+    from teams_server.websocket import _broadcast
 
     _broadcast("settings_updated", settings)
     return JSONResponse({"status": "ok", "settings": settings})
@@ -517,7 +517,7 @@ async def _end_takeover_async(team_id: str) -> None:
     relaunch (multiple seconds), so it must run off the loop or it freezes every
     agent's sweep, all WS broadcasts, and every other request."""
     try:
-        from swarm_server.browser_pool import team_browser_manager
+        from teams_server.browser_pool import team_browser_manager
         await asyncio.get_running_loop().run_in_executor(
             None, team_browser_manager.end_takeover, team_id
         )
@@ -528,8 +528,8 @@ async def _end_takeover_async(team_id: str) -> None:
 async def _finalize_human_answer(daemon, qid: str, response_text: str) -> Dict[str, Any]:
     """Route a human's answer through the single atomic delivery point and run any
     follow-up (resume-task enqueue, browser hand-back). Returns a JSON-able dict."""
-    from swarm_server.tools import deliver_human_answer
-    from swarm_server.websocket import _broadcast
+    from teams_server.tools import deliver_human_answer
+    from teams_server.websocket import _broadcast
 
     result = deliver_human_answer(qid, response_text)
     if not result.get("ok"):
@@ -564,7 +564,7 @@ async def _finalize_human_answer(daemon, qid: str, response_text: str) -> Dict[s
 def _resolve_pending_qid(agent_name: str, daemon) -> Optional[str]:
     """The question this agent is (or was last) blocking on: its current
     human_question_id if still pending, else the newest pending question."""
-    from swarm_server.tools import _pending_human_questions, _pending_lock
+    from teams_server.tools import _pending_human_questions, _pending_lock
     with _pending_lock:
         cur = getattr(daemon, "human_question_id", None)
         q = _pending_human_questions.get(cur) if cur else None
@@ -644,7 +644,7 @@ async def del_team(team_id: str):
 # ---------------------------------------------------------------------------
 @app.get("/teams/{team_id}/credentials")
 async def get_team_credentials(team_id: str):
-    from swarm_server.credentials import list_credentials_public
+    from teams_server.credentials import list_credentials_public
 
     try:
         creds = list_credentials_public(team_id)
@@ -655,7 +655,7 @@ async def get_team_credentials(team_id: str):
 
 @app.post("/teams/{team_id}/credentials")
 async def post_team_credential(team_id: str, request: Request):
-    from swarm_server.credentials import save_credential
+    from teams_server.credentials import save_credential
 
     body = await request.json()
     try:
@@ -674,7 +674,7 @@ async def post_team_credential(team_id: str, request: Request):
 
 @app.delete("/teams/{team_id}/credentials/{site}")
 async def delete_team_credential(team_id: str, site: str):
-    from swarm_server.credentials import delete_credential
+    from teams_server.credentials import delete_credential
 
     try:
         deleted = delete_credential(team_id, site)
@@ -704,7 +704,7 @@ def _resolve_project_dir(team_id: str):
     cfg = load_agents_config()
     if team_id not in (cfg.get("teams", {}) or {}):
         return None, JSONResponse({"error": f"Unknown team '{team_id}'."}, status_code=404)
-    from swarm_server.config import _get_project_dir
+    from teams_server.config import _get_project_dir
     return _get_project_dir(team_id, cfg).resolve(), None
 
 
@@ -844,7 +844,7 @@ async def open_team_workspace_file(team_id: str, request: Request):
 
 # ---------------------------------------------------------------------------
 # Team costs — REAL provider token counts (token_usage events), priced with
-# the swarm-side map. LiteLLM's Postgres SpendLogs stay the billing ground
+# the teams-side map. LiteLLM's Postgres SpendLogs stay the billing ground
 # truth; this is the operational view: who spends, cache hit rates, sweep
 # skip ratio.
 # ---------------------------------------------------------------------------
@@ -852,7 +852,7 @@ async def open_team_workspace_file(team_id: str, request: Request):
 async def get_team_costs(team_id: str, hours: float = 24):
     import time
 
-    from swarm_server.model_config import estimate_cost_usd
+    from teams_server.model_config import estimate_cost_usd
 
     hours = max(0.1, min(float(hours), 24 * 14))
     since_ts = time.time() - hours * 3600
@@ -930,7 +930,7 @@ async def get_team_costs(team_id: str, hours: float = 24):
             sweeps["skipped"] += monitor_db.count_events_since(
                 name, "supervisor_sweep_skipped", since_ts)
 
-    from swarm_server.budget import budget_tracker
+    from teams_server.budget import budget_tracker
     return JSONResponse({"team_id": team_id, "hours": hours,
                          "agents": per_agent, "totals": totals,
                          "sweeps": sweeps,
@@ -938,18 +938,18 @@ async def get_team_costs(team_id: str, hours: float = 24):
 
 
 # ---------------------------------------------------------------------------
-# Team budget — daily spend cap with auto-pause (see swarm_server/budget.py)
+# Team budget — daily spend cap with auto-pause (see teams_server/budget.py)
 # ---------------------------------------------------------------------------
 @app.get("/teams/{team_id}/budget")
 async def get_team_budget_status(team_id: str):
-    from swarm_server.budget import budget_tracker
+    from teams_server.budget import budget_tracker
     return JSONResponse(budget_tracker.status(team_id))
 
 
 @app.put("/teams/{team_id}/budget")
 async def put_team_budget(team_id: str, request: Request):
-    from swarm_server.config import set_team_budget
-    from swarm_server.budget import budget_tracker
+    from teams_server.config import set_team_budget
+    from teams_server.budget import budget_tracker
 
     body = await request.json()
     try:
@@ -971,7 +971,7 @@ async def put_team_budget(team_id: str, request: Request):
 @app.post("/teams/{team_id}/budget/override")
 async def post_team_budget_override(team_id: str):
     """Resume a budget-paused team for the rest of the UTC day."""
-    from swarm_server.budget import budget_tracker
+    from teams_server.budget import budget_tracker
     budget_tracker.override_today(team_id)
     # Wake the team's daemons so held work resumes immediately, not next tick.
     cfg = load_agents_config()
@@ -1185,7 +1185,7 @@ async def update_agent_soul(agent_name: str, request: Request):
             daemon._reinit_requested = True
         log.info("[Dynamic Registry] Role soul updated for agent '%s'", agent_name)
 
-    from swarm_server.websocket import _broadcast
+    from teams_server.websocket import _broadcast
 
     _broadcast("soul_updated", {"agent_name": agent_name, "timestamp": __import__("time").time()})
     return JSONResponse({"status": "success", "message": f"Role soul for '{agent_name}' updated."})
@@ -1226,7 +1226,7 @@ def _apply_config_fields(base: Dict[str, Any], body: Dict[str, Any]) -> Dict[str
             continue
         if key in ("reasoning_effort", "provider", "model") and val in ("", None, "default"):
             # Empty model/provider clears the per-agent override → inherit the
-            # swarm default. (provider "default" sentinel handled the same way.)
+            # teams default. (provider "default" sentinel handled the same way.)
             updated.pop(key, None)
             continue
         if key in ("enabled_toolsets", "disabled_toolsets"):
@@ -1244,7 +1244,7 @@ def _apply_config_fields(base: Dict[str, Any], body: Dict[str, Any]) -> Dict[str
 @app.get("/models")
 async def get_models():
     """Model ids the CONFIGURED default backend serves (for the config dropdown)."""
-    from swarm_server.model_config import resolve_model, get_default_model, _preset
+    from teams_server.model_config import resolve_model, get_default_model, _preset
 
     eff = resolve_model({})  # the default backend (no per-agent override)
     served = list_backend_models(eff.get("base_url") or None, eff.get("api_key") or None)
@@ -1258,7 +1258,7 @@ async def get_models():
 @app.get("/providers")
 async def get_providers():
     """Provider catalogue for the setup screen (Hermes registry + OpenRouter/Custom)."""
-    from swarm_server.model_config import build_provider_presets
+    from teams_server.model_config import build_provider_presets
 
     return JSONResponse({"providers": build_provider_presets()})
 
@@ -1266,7 +1266,7 @@ async def get_providers():
 @app.get("/setup/status")
 async def setup_status():
     """Whether a model is configured (drives the first-run setup screen)."""
-    from swarm_server.model_config import (
+    from teams_server.model_config import (
         is_model_configured, get_default_model, detect_global_hermes_model,
     )
 
@@ -1286,8 +1286,8 @@ async def setup_status():
 
 @app.post("/setup/model")
 async def setup_model(request: Request):
-    """Set the swarm-wide DEFAULT model and re-init all agents to pick it up."""
-    from swarm_server.model_config import set_default_model, detect_global_hermes_model
+    """Set the teams-wide DEFAULT model and re-init all agents to pick it up."""
+    from teams_server.model_config import set_default_model, detect_global_hermes_model
 
     body = await request.json()
     # Convenience: "adopt" the model detected in the user's ~/.hermes.
@@ -1312,7 +1312,7 @@ async def setup_model(request: Request):
     for name in list(daemons.keys()):
         _update_daemon_cfg(name, load_agents_config()["agents"].get(name, daemons[name].cfg))
 
-    from swarm_server.websocket import _broadcast
+    from teams_server.websocket import _broadcast
 
     _broadcast("model_default_updated", {
         "provider": provider, "model": model, "timestamp": __import__("time").time(),
@@ -1333,7 +1333,7 @@ async def get_agent_config(agent_name: str):
         "name": a.get("name", agent_name),
         "team_id": a.get("team_id"),
         "model": a.get("model"),  # raw per-agent override (None = inherit default)
-        "effective_model": __import__("swarm_server.model_config", fromlist=["resolve_model"]).resolve_model(a).get("model"),
+        "effective_model": __import__("teams_server.model_config", fromlist=["resolve_model"]).resolve_model(a).get("model"),
         "provider": a.get("provider"),
         "autonomous": bool(a.get("autonomous", False)),
         "sweep_interval": a.get("sweep_interval"),
@@ -1374,7 +1374,7 @@ async def patch_agent_config(agent_name: str, request: Request):
     save_agent_config(agent_name, updated)
     _update_daemon_cfg(agent_name, updated)
 
-    from swarm_server.websocket import _broadcast
+    from teams_server.websocket import _broadcast
 
     _broadcast("agent_config_updated", {
         "agent_name": agent_name,
@@ -1390,7 +1390,7 @@ async def patch_agent_config(agent_name: str, request: Request):
 def _crons_with_runtime(agent_name: str, stored: list) -> list:
     """Merge stored crons with the daemon's live next/last-fire timestamps and a
     human-readable schedule description for the dashboard."""
-    from swarm_server.cron import cron_describe
+    from teams_server.cron import cron_describe
 
     daemon = daemons.get(agent_name)
     runtime = {c.get("id"): c for c in daemon.crons_runtime()} if daemon else {}
@@ -1474,7 +1474,7 @@ def _refresh_daemon_crons(agent_name: str):
         with daemon._lock:
             daemon.cfg = entry
             daemon._load_crons(entry)
-    from swarm_server.websocket import _broadcast
+    from teams_server.websocket import _broadcast
 
     _broadcast("cron_updated", {"agent_name": agent_name, "timestamp": __import__("time").time()})
 
@@ -1483,7 +1483,7 @@ def _refresh_daemon_crons(agent_name: str):
 # Architect / master team-builder. A teamless Hermes agent the human chats with
 # to design and build teams. Its tools mutate config + spawn/despawn daemons; the
 # daemon lifecycle must happen on THIS event loop, so we inject thread-safe hooks
-# (the master turn runs on its own worker thread). See swarm_server/master.py.
+# (the master turn runs on its own worker thread). See teams_server/master.py.
 # ---------------------------------------------------------------------------
 def _master_spawn(agent_name: str, loop: asyncio.AbstractEventLoop) -> None:
     def _do():
@@ -1538,7 +1538,7 @@ def _master_despawn(token: str, loop: asyncio.AbstractEventLoop) -> None:
 
 def _wire_master(loop: asyncio.AbstractEventLoop) -> None:
     try:
-        from swarm_server import master as _master
+        from teams_server import master as _master
 
         _master.set_master_hooks(
             spawn=lambda n: _master_spawn(n, loop),
@@ -1556,7 +1556,7 @@ def _wire_master(loop: asyncio.AbstractEventLoop) -> None:
 
 @app.get("/master/status")
 async def master_status():
-    from swarm_server.master import get_master
+    from teams_server.master import get_master
 
     m = get_master()
     return JSONResponse({"configured": m.is_configured(), "busy": m.is_busy(), "model": m.model()})
@@ -1564,14 +1564,14 @@ async def master_status():
 
 @app.get("/master/history")
 async def master_history(limit: int = 120):
-    from swarm_server.master import get_master
+    from teams_server.master import get_master
 
     return JSONResponse({"messages": get_master().history(max(1, min(int(limit or 120), 500)))})
 
 
 @app.post("/master/chat")
 async def master_chat(request: Request):
-    from swarm_server.master import get_master
+    from teams_server.master import get_master
 
     body = await request.json()
     message = (body.get("message") or "").strip()
@@ -1587,7 +1587,7 @@ async def master_chat(request: Request):
 
 @app.post("/master/reset")
 async def master_reset():
-    from swarm_server.master import get_master
+    from teams_server.master import get_master
 
     get_master().reset()
     return JSONResponse({"status": "ok"})
@@ -1595,9 +1595,9 @@ async def master_reset():
 
 @app.get("/toolsets")
 async def get_toolsets():
-    """Hermes toolsets + swarm-native tools (for the allowed/disabled-tools picker)."""
-    from swarm_server.tools import list_swarm_tools
-    return JSONResponse({"toolsets": list_toolsets(), "swarm_tools": list_swarm_tools()})
+    """Hermes toolsets + teams-native tools (for the allowed/disabled-tools picker)."""
+    from teams_server.tools import list_teams_tools
+    return JSONResponse({"toolsets": list_toolsets(), "teams_tools": list_teams_tools()})
 
 
 @app.get("/agent/{agent_name}/cli")
@@ -1630,7 +1630,7 @@ async def get_agent_cli(agent_name: str):
 # ---------------------------------------------------------------------------
 @app.get("/proposals")
 async def get_proposals():
-    from swarm_server.tools import get_config_proposals
+    from teams_server.tools import get_config_proposals
 
     proposals = get_config_proposals()
     proposals.sort(key=lambda p: p["timestamp"], reverse=True)
@@ -1642,8 +1642,8 @@ async def get_proposals():
 
 @app.post("/proposals/{proposal_id}/approve")
 async def approve_proposal(proposal_id: str):
-    from swarm_server.tools import get_config_proposals, resolve_config_proposal
-    from swarm_server.websocket import _broadcast
+    from teams_server.tools import get_config_proposals, resolve_config_proposal
+    from teams_server.websocket import _broadcast
 
     target = next((p for p in get_config_proposals() if p["id"] == proposal_id), None)
     if target is None:
@@ -1681,8 +1681,8 @@ async def approve_proposal(proposal_id: str):
 
 @app.post("/proposals/{proposal_id}/reject")
 async def reject_proposal(proposal_id: str):
-    from swarm_server.tools import resolve_config_proposal
-    from swarm_server.websocket import _broadcast
+    from teams_server.tools import resolve_config_proposal
+    from teams_server.websocket import _broadcast
 
     resolved = resolve_config_proposal(proposal_id, "rejected")
     if resolved is None:
@@ -1873,7 +1873,7 @@ def _backend_reachable_cached() -> Optional[bool]:
         return _BACKEND_CHECK["ok"]
     _BACKEND_CHECK["ts"] = _t.time()
     try:
-        from swarm_server.model_config import resolve_model
+        from teams_server.model_config import resolve_model
         eff = resolve_model({})
         base_url = (eff.get("base_url") or "").strip()
         if not base_url:
@@ -1898,7 +1898,7 @@ async def health(request: Request):
     # When auth is on, an UNauthenticated probe gets only liveness — the agent /
     # team names are sensitive. An authenticated probe (or no-auth localhost)
     # gets the full operational picture.
-    if SWARM_API_KEY and not _request_key_ok(request):
+    if TEAMS_API_KEY and not _request_key_ok(request):
         return {"status": "ok"}
     cfg = load_agents_config()
     queue_depth = 0
@@ -1925,7 +1925,7 @@ async def version_check(force: bool = False):
     Auth-exempt (like /health) so the dashboard can call it pre-login. The check
     is cached (~6h) and reads GitHub off the event loop, so this never blocks.
     """
-    from swarm_server.update_check import check_for_update
+    from teams_server.update_check import check_for_update
 
     return await asyncio.to_thread(check_for_update, force)
 
@@ -1935,7 +1935,7 @@ async def auth_check(request: Request):
     """Self-reporting auth probe the dashboard hits at boot. Always 200 so a
     reverse proxy's own 401s can't be mistaken for 'wrong key'. Leaks nothing
     beyond whether auth is enabled."""
-    if not SWARM_API_KEY:
+    if not TEAMS_API_KEY:
         return {"auth_required": False, "authorized": True}
     return {"auth_required": True, "authorized": _request_key_ok(request)}
 
@@ -1959,7 +1959,7 @@ async def root_dashboard():
 # ---------------------------------------------------------------------------
 @app.get("/inbox")
 async def get_human_inbox():
-    from swarm_server.tools import get_pending_questions
+    from teams_server.tools import get_pending_questions
 
     questions = get_pending_questions()
     # Sort by timestamp desc, keep only last 50 to avoid bloat
@@ -1972,7 +1972,7 @@ async def get_human_inbox():
 
 @app.post("/inbox/{agent_name}/respond")
 async def respond_to_human_question(agent_name: str, request: Request):
-    from swarm_server.tools import _pending_human_questions, _pending_lock
+    from teams_server.tools import _pending_human_questions, _pending_lock
 
     body = await request.json()
     response_text = body.get("response", "")

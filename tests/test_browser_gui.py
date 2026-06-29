@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for the GUI-grade browser tools (swarm_server/browser_gui_tools.py)
+"""Unit tests for the GUI-grade browser tools (teams_server/browser_gui_tools.py)
 and the configurable vision model. No LLM, no Hermes, no browser required —
 the agent-browser dispatch layer is stubbed.
 
@@ -30,8 +30,8 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from swarm_server import browser_gui_tools as gui  # noqa: E402
-from swarm_server.browser_gui_tools import (  # noqa: E402
+from teams_server import browser_gui_tools as gui  # noqa: E402
+from teams_server.browser_gui_tools import (  # noqa: E402
     GUI_BROWSER_TOOL_SCHEMAS,
     _browser_click_xy_handler,
     _browser_dblclick_handler,
@@ -308,7 +308,7 @@ def test_locate_not_found_and_bad_reply(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_vision_model_setting_layering(monkeypatch):
-    import swarm_server.config as config
+    import teams_server.config as config
 
     store = {"agents": {}}
     monkeypatch.setattr(config, "load_agents_config", lambda: store)
@@ -324,7 +324,7 @@ def test_vision_model_setting_layering(monkeypatch):
 
 
 def test_settings_defaults_include_vision_model():
-    from swarm_server.config import _GLOBAL_SETTINGS_DEFAULTS
+    from teams_server.config import _GLOBAL_SETTINGS_DEFAULTS
 
     assert "vision_model" in _GLOBAL_SETTINGS_DEFAULTS
 
@@ -335,7 +335,7 @@ def test_settings_defaults_include_vision_model():
 
 @pytest.fixture()
 def clean_probe_cache():
-    import swarm_server.config as config
+    import teams_server.config as config
 
     config._VISION_PROBE_CACHE.clear()
     yield config
@@ -343,7 +343,7 @@ def clean_probe_cache():
 
 
 def test_probe_png_is_valid_64x64():
-    import swarm_server.config as config
+    import teams_server.config as config
 
     assert _png_dimensions_from_bytes(config._probe_png()) == (64, 64)
 
@@ -512,11 +512,11 @@ def test_breadcrumb_no_alerts_key_when_clean(monkeypatch):
 
 @pytest.fixture()
 def creds_env(tmp_path, monkeypatch):
-    import swarm_server.credentials as creds
+    import teams_server.credentials as creds
 
     monkeypatch.setattr(creds, "WORKSPACE_ROOT", tmp_path)
     daemon = types.SimpleNamespace(cfg={"team_id": "teamx"})
-    import swarm_server.tools as tools_mod
+    import teams_server.tools as tools_mod
 
     monkeypatch.setattr(tools_mod, "_daemon_registry", {"tester": daemon})
     return creds
@@ -567,8 +567,8 @@ def test_locate_endpoint_prefers_capable_main_model(monkeypatch, clean_probe_cac
     config = clean_probe_cache
     monkeypatch.setattr(config, "_vision_probe", lambda m, b, k: True)
 
-    import swarm_server.model_config as model_config
-    import swarm_server.tools as tools_mod
+    import teams_server.model_config as model_config
+    import teams_server.tools as tools_mod
 
     daemon = types.SimpleNamespace(cfg={"model": "main-vlm"})
     monkeypatch.setattr(tools_mod, "_daemon_registry", {"tester": daemon})

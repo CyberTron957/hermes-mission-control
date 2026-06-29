@@ -26,9 +26,9 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from swarm_server.config import WORKSPACE_ROOT, validate_id
+from teams_server.config import WORKSPACE_ROOT, validate_id
 
-log = logging.getLogger("swarm.credentials")
+log = logging.getLogger("teams.credentials")
 
 _LOCK = threading.Lock()
 
@@ -184,7 +184,7 @@ def _caller_team(kwargs: dict) -> "tuple[str, str]":
     task_id = kwargs.get("task_id", "") or ""
     caller = task_id.split(":", 1)[1] if task_id.startswith("agent_name:") else task_id
     try:
-        from swarm_server.tools import _daemon_registry
+        from teams_server.tools import _daemon_registry
 
         daemon = _daemon_registry.get(caller)
         team = (getattr(daemon, "cfg", None) or {}).get("team_id", "")

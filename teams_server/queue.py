@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List
 
-log = logging.getLogger("swarm.queue")
+log = logging.getLogger("teams.queue")
 
 # Terminal (done/failed) rows are kept only this long. Without a sweep the
 # per-agent *_queue.db grows monotonically forever on a 24/7 run, since payloads

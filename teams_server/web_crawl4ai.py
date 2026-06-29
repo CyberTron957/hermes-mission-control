@@ -18,7 +18,7 @@ primary engine if that optional package is installed (JS rendering via the
 ``[web]`` extra), and falls back to ddgs (search) / httpx (fetch) otherwise —
 both of which are core dependencies, so the fallback always works.
 
-Called from swarm_server.tools._register_custom_tools() (team agents) and the
+Called from teams_server.tools._register_custom_tools() (team agents) and the
 Architect setup in master.py; re-registers the existing tool names with
 registry.register(..., override=True) so the schema agents see is unchanged.
 
@@ -166,7 +166,7 @@ def _httpx_fetch(url: str) -> str:
         url,
         timeout=30,
         follow_redirects=True,
-        headers={"User-Agent": "Mozilla/5.0 (compatible; SwarmBot/1.0)"},
+        headers={"User-Agent": "Mozilla/5.0 (compatible; TeamsBot/1.0)"},
     )
     r.raise_for_status()
     text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", r.text, flags=re.S | re.I)

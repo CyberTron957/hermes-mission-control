@@ -23,15 +23,15 @@ from typing import Optional
 
 from packaging.version import InvalidVersion, parse as _parse_version
 
-from swarm_server import __version__
-from swarm_server.config import PROJECT_ROOT, _is_source_checkout, _resolve_data_root
+from teams_server import __version__
+from teams_server.config import PROJECT_ROOT, _is_source_checkout, _resolve_data_root
 
 log = logging.getLogger(__name__)
 
 # Raw view of pyproject.toml on the branch a `git pull` would fast-forward to.
 _LATEST_PYPROJECT_URL = (
     "https://raw.githubusercontent.com/"
-    "CyberTron957/hermes-mission-control/main/pyproject.toml"
+    "CyberTron957/agent-teams/main/pyproject.toml"
 )
 
 # Re-hit GitHub at most this often; on-load checks read the cache in between so
@@ -51,7 +51,7 @@ def get_install_method() -> str:
     ``unknown`` is treated like ``git`` by callers, but they warn that the upgrade
     path is unverified.
     """
-    if os.path.exists("/.dockerenv") or os.environ.get("SWARM_DATA_DIR") == "/data":
+    if os.path.exists("/.dockerenv") or os.environ.get("TEAMS_DATA_DIR") == "/data":
         return "docker"
     if _is_source_checkout() and (PROJECT_ROOT / ".git").exists():
         return "git"

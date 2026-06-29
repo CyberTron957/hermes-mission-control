@@ -16,7 +16,7 @@ team that works on its own and asks you for help when it needs it.
 1. **An LLM provider API key.** You'll configure it with **`hermes setup`** —
    Hermes' built-in wizard. It supports 40+ providers (Anthropic, OpenAI,
    [OpenRouter](https://openrouter.ai), Groq, DeepSeek, local models, …): pick
-   one, paste your key, choose a model. The swarm reads that config directly, so
+   one, paste your key, choose a model. The teams reads that config directly, so
    there's nothing provider-specific to wire up separately. *(Using a
    [LiteLLM](https://github.com/BerriAI/litellm) proxy or any OpenAI-compatible
    endpoint? It's just another provider — pick **custom** in `hermes setup` and
@@ -35,7 +35,7 @@ Each path ends with the dashboard on **http://127.0.0.1:8000**.
 ### One line — macOS & Linux
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/CyberTron957/hermes-mission-control/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/CyberTron957/agent-teams/main/install.sh)
 ```
 
 That clones the repo, sets up a local `.venv`, installs everything, fetches a
@@ -51,11 +51,11 @@ use Docker below. **Already cloned the repo?** `bash install.sh` does the same.
 ### Docker
 
 Runs the agents *inside* the container (keeping their terminal access off your
-host); data persists in the `swarm-data` volume.
+host); data persists in the `teams-data` volume.
 
 ```bash
 git clone <this-repo> agent-teams && cd agent-teams
-docker compose run --rm -e HERMES_HOME=/data/.hermes-shared swarm hermes setup
+docker compose run --rm -e HERMES_HOME=/data/.hermes-shared teams hermes setup
 docker compose up --build
 ```
 
@@ -77,7 +77,7 @@ override per-agent) is whatever you picked in `hermes setup`. You can change it
 anytime from the dashboard — it reads the available models live and writes your
 choice back to the same Hermes config.
 
-You now have an empty swarm. There are two ways to build your first team — let
+You now have an empty teams. There are two ways to build your first team — let
 the **Architect** do it for you (recommended), or wire it by hand.
 
 ---
@@ -128,7 +128,7 @@ the dashboard's ⚙️ panel — no restart.
     mission forward without waiting for a task. Keep **one** autonomous "driver"
     per team (usually the coordinator) so the team has momentum without
     everyone self-triggering at once.
-  - **Model** — defaults to the swarm default; override per agent if you want a
+  - **Model** — defaults to the teams default; override per agent if you want a
     cheaper model for grunt work and a stronger one for the lead.
 - **Shared workspace** — `workspace.md` is a shared brief injected into every
   agent's context; the team's `project/` directory is their shared working area.
@@ -175,7 +175,7 @@ takeover above rather than handing over a password.
 
 ## 7. Keep spending under control (budgets)
 
-A 24/7 swarm on a paid API can run up a bill overnight. Set a **per-team daily
+A 24/7 teams on a paid API can run up a bill overnight. Set a **per-team daily
 budget**: click the cost badge in the top bar and enter a USD cap.
 
 When a team reaches its cap, its agents **pause** — in-flight work is **held,
@@ -204,7 +204,7 @@ Agents can also schedule and cancel their own wake-ups via the
 ## 9. Going beyond your laptop (exposing it safely)
 
 By default the server binds `127.0.0.1` with no authentication — fine for local
-use. **The moment you expose the port (VPS/LAN), set `SWARM_API_KEY`.** With it
+use. **The moment you expose the port (VPS/LAN), set `TEAMS_API_KEY`.** With it
 set, every endpoint *and* the live WebSocket require the key, and the dashboard
 prompts for it once (then remembers it in your browser).
 
@@ -217,13 +217,13 @@ bare-metal with the included systemd unit, plus a threat model — is in
 
 ## 10. Data, backups, and logs
 
-- **State** lives under `SWARM_DATA_DIR` (the `swarm-data` volume in Docker, or
+- **State** lives under `TEAMS_DATA_DIR` (the `teams-data` volume in Docker, or
   `./data` / `~/.agent-teams/data` otherwise): team configs, task queues,
   per-agent conversation history, the shared project, and credentials.
 - **Backups**: every config save keeps a rotating copy under
-  `<data>/config_backups/`. Back up the whole `SWARM_DATA_DIR` to be safe.
+  `<data>/config_backups/`. Back up the whole `TEAMS_DATA_DIR` to be safe.
 - **Logs**: always on stdout (so `docker logs` / journald capture them). Set
-  `SWARM_LOG_FILE=/path/to/swarm.log` for an on-disk rotating trail too.
+  `TEAMS_LOG_FILE=/path/to/teams.log` for an on-disk rotating trail too.
 - **Health**: `GET /health` reports liveness to anyone and the full picture
   (uptime, queue depth, LLM-backend reachability) to an authenticated caller —
   point an uptime monitor at it.
@@ -243,7 +243,7 @@ logins persist across restarts too.
 
 | Symptom | Fix |
 |---|---|
-| Dashboard loads but nothing works / 401s | `SWARM_API_KEY` is set — enter it when prompted (or unset it for local use). |
+| Dashboard loads but nothing works / 401s | `TEAMS_API_KEY` is set — enter it when prompted (or unset it for local use). |
 | "Hermes NOT importable" | `pip install hermes-agent`, or set `HERMES_AGENT_PATH`. Run `agent-teams doctor`. |
 | "LLM backend NOT reachable" | Re-run `hermes setup` (or `agent-teams doctor`) — check the provider key, and for a custom endpoint that its base URL serves the chosen model. |
 | Browser tools unavailable | `playwright install chromium` (or install Chrome). Everything else still works. |

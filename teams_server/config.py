@@ -10,12 +10,12 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-log = logging.getLogger("swarm.config")
+log = logging.getLogger("teams.config")
 
 
 def configure_logging(level: int = logging.INFO) -> None:
     """Set up root logging once for an entry point. Always logs to stdout
-    (captured by Docker / journald); if SWARM_LOG_FILE is set, ALSO writes to a
+    (captured by Docker / journald); if TEAMS_LOG_FILE is set, ALSO writes to a
     rotating file (10 MB × 5) so a bare-metal 24/7 run keeps an on-disk trail."""
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s — %(message)s",
                             datefmt="%H:%M:%S")
@@ -25,18 +25,18 @@ def configure_logging(level: int = logging.INFO) -> None:
         sh = logging.StreamHandler()
         sh.setFormatter(fmt)
         root.addHandler(sh)
-    log_file = os.environ.get("SWARM_LOG_FILE", "").strip()
-    if log_file and not any(getattr(h, "_swarm_file", False) for h in root.handlers):
+    log_file = os.environ.get("TEAMS_LOG_FILE", "").strip()
+    if log_file and not any(getattr(h, "_teams_file", False) for h in root.handlers):
         try:
             from logging.handlers import RotatingFileHandler
             Path(log_file).parent.mkdir(parents=True, exist_ok=True)
             fh = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=5)
             fh.setFormatter(fmt)
-            fh._swarm_file = True
+            fh._teams_file = True
             root.addHandler(fh)
             log.info("Logging to %s (rotating 10MB × 5)", log_file)
         except Exception as e:
-            log.warning("Could not open SWARM_LOG_FILE %s: %s", log_file, e)
+            log.warning("Could not open TEAMS_LOG_FILE %s: %s", log_file, e)
 
 
 def ensure_hermes_importable() -> None:
@@ -150,10 +150,10 @@ def _is_source_checkout() -> bool:
 def _resolve_data_root() -> Path:
     """Writable state dir (configs, queues, workspaces, monitoring db).
 
-    SWARM_DATA_DIR wins (Docker sets it to a mounted volume). Otherwise the repo's
+    TEAMS_DATA_DIR wins (Docker sets it to a mounted volume). Otherwise the repo's
     ./data in a source checkout, else ~/.agent-teams/data for a pip install (never
     write inside site-packages)."""
-    env = os.environ.get("SWARM_DATA_DIR")
+    env = os.environ.get("TEAMS_DATA_DIR")
     if env:
         return Path(env).expanduser()
     if _is_source_checkout():
@@ -163,7 +163,7 @@ def _resolve_data_root() -> Path:
 
 def _resolve_dashboard_dir() -> Path:
     """Locate the static dashboard across source / in-package / pip data-files."""
-    env = os.environ.get("SWARM_DASHBOARD_DIR")
+    env = os.environ.get("TEAMS_DASHBOARD_DIR")
     if env:
         return Path(env).expanduser()
     for cand in (
@@ -188,31 +188,31 @@ WORKSPACE_ROOT = DATA_ROOT / "teams"
 # pip install, and in Docker without edits)
 # ---------------------------------------------------------------------------
 # Dashboard bind address. Stays 127.0.0.1 locally for safety; Docker sets
-# SWARM_HOST=0.0.0.0. Bind a public interface only with SWARM_API_KEY set.
-SERVER_HOST = os.environ.get("SWARM_HOST", "127.0.0.1")
-SERVER_PORT = int(os.environ.get("SWARM_PORT", "8000"))
+# TEAMS_HOST=0.0.0.0. Bind a public interface only with TEAMS_API_KEY set.
+SERVER_HOST = os.environ.get("TEAMS_HOST", "127.0.0.1")
+SERVER_PORT = int(os.environ.get("TEAMS_PORT", "8000"))
 
-SWEEP_INTERVAL_SECONDS = int(os.environ.get("SWARM_SWEEP_INTERVAL", "10"))
+SWEEP_INTERVAL_SECONDS = int(os.environ.get("TEAMS_SWEEP_INTERVAL", "10"))
 
 # Default model NAME when nothing else is configured — EMPTY by default. The
-# swarm has no built-in model and no proxy: you choose a provider + model with
+# teams has no built-in model and no proxy: you choose a provider + model with
 # `hermes setup` (any of 40+ providers, incl. a custom / OpenAI-compatible
 # endpoint) or in the dashboard. resolve_model() layers per-agent override →
-# swarm default → ~/.hermes; an unconfigured swarm surfaces a "run hermes setup"
-# error rather than guessing. Optional operator override: SWARM_DEFAULT_MODEL.
-DEFAULT_MODEL = os.environ.get("SWARM_DEFAULT_MODEL", "")
+# teams default → ~/.hermes; an unconfigured teams surfaces a "run hermes setup"
+# error rather than guessing. Optional operator override: TEAMS_DEFAULT_MODEL.
+DEFAULT_MODEL = os.environ.get("TEAMS_DEFAULT_MODEL", "")
 
 # Model-dropdown fallback when the configured backend can't be queried for its
 # served models (native providers expose no /models list). Empty = show only
 # what's actually resolvable; the UI also lets you type any model name.
 AVAILABLE_MODELS_FALLBACK = [m.strip() for m in os.environ.get(
-    "SWARM_FALLBACK_MODELS", "").split(",") if m.strip()]
+    "TEAMS_FALLBACK_MODELS", "").split(",") if m.strip()]
 
 # Model used ONLY for browser_vision (screenshot reading) when the agent's main
 # model can't read images. Empty = let the resolved backend / Hermes handle
-# vision natively. Set SWARM_VISION_MODEL only for a text-only custom endpoint
+# vision natively. Set TEAMS_VISION_MODEL only for a text-only custom endpoint
 # that needs a separate multimodal model for grounding.
-VISION_MODEL = os.environ.get("SWARM_VISION_MODEL", "")
+VISION_MODEL = os.environ.get("TEAMS_VISION_MODEL", "")
 
 
 def list_backend_models(base_url: Optional[str] = None, api_key: Optional[str] = None) -> List[str]:
@@ -222,7 +222,7 @@ def list_backend_models(base_url: Optional[str] = None, api_key: Optional[str] =
     operator configured via `hermes setup` — but ONLY a custom / OpenAI-compatible
     endpoint exposes a /models list. Native providers (anthropic/openai/…) don't,
     so with no base_url (or on error) this returns AVAILABLE_MODELS_FALLBACK
-    (empty unless SWARM_FALLBACK_MODELS is set). The UI lets you type any model
+    (empty unless TEAMS_FALLBACK_MODELS is set). The UI lets you type any model
     name regardless.
     """
     base = (base_url or "").rstrip("/")
@@ -292,7 +292,7 @@ COMPRESSION_PROTECT_LAST_N = 12      # recent tail turns kept verbatim
 # ---------------------------------------------------------------------------
 # Autonomous 24/7 operation
 # ---------------------------------------------------------------------------
-# The swarm is task-queue-driven: an agent wakes on a task, processes it, then
+# The teams is task-queue-driven: an agent wakes on a task, processes it, then
 # goes idle. That means a team goes DORMANT after finishing a brief. To run
 # 24/7, mark a coordinator agent with cfg["autonomous"]=True: its daemon then
 # self-injects a "continue the mission" task whenever it has been idle (empty
@@ -304,12 +304,12 @@ COMPRESSION_PROTECT_LAST_N = 12      # recent tail turns kept verbatim
 # COST WARNING: each heartbeat cycle consumes tokens (the last full GTM cycle
 # was ~4.8M tokens). Tune the interval to your budget. Pause by setting the
 # agent's autonomous flag False, stopping its daemon, or stopping the server.
-# Override the interval at launch with SWARM_HEARTBEAT_SECONDS.
-AUTONOMOUS_HEARTBEAT_SECONDS = int(os.environ.get("SWARM_HEARTBEAT_SECONDS", "1800"))
+# Override the interval at launch with TEAMS_HEARTBEAT_SECONDS.
+AUTONOMOUS_HEARTBEAT_SECONDS = int(os.environ.get("TEAMS_HEARTBEAT_SECONDS", "1800"))
 
 # Prompt/soul construction (AUTONOMOUS_HEARTBEAT_PROMPT, CRON_WAKEUP_PROMPT,
 # SUPERVISOR_SWEEP_PROMPT, SUPERVISOR_DEFAULT_SOUL, compose_* / _build_* helpers)
-# lives in swarm_server/prompts.py — the single home for prompt text + assembly.
+# lives in teams_server/prompts.py — the single home for prompt text + assembly.
 
 # ---------------------------------------------------------------------------
 # Tool output caps — bound a single tool result's size in the conversation.
@@ -336,18 +336,18 @@ TOOL_OUTPUT_MAX_LINE_LENGTH = 2000
 # survives ~QUANTUM messages instead of busting every turn).
 # ---------------------------------------------------------------------------
 TOOL_RESULT_AGE_ENABLED = os.environ.get(
-    "SWARM_TOOL_RESULT_AGE_ENABLED", "1").lower() not in ("0", "false", "no")
-TOOL_RESULT_AGE_KEEP_MESSAGES = int(os.environ.get("SWARM_TOOL_RESULT_AGE_KEEP_MESSAGES", "40"))
-TOOL_RESULT_AGE_MIN_CHARS = int(os.environ.get("SWARM_TOOL_RESULT_AGE_MIN_CHARS", "600"))
-TOOL_RESULT_AGE_QUANTUM = int(os.environ.get("SWARM_TOOL_RESULT_AGE_QUANTUM", "20"))
+    "TEAMS_TOOL_RESULT_AGE_ENABLED", "1").lower() not in ("0", "false", "no")
+TOOL_RESULT_AGE_KEEP_MESSAGES = int(os.environ.get("TEAMS_TOOL_RESULT_AGE_KEEP_MESSAGES", "40"))
+TOOL_RESULT_AGE_MIN_CHARS = int(os.environ.get("TEAMS_TOOL_RESULT_AGE_MIN_CHARS", "600"))
+TOOL_RESULT_AGE_QUANTUM = int(os.environ.get("TEAMS_TOOL_RESULT_AGE_QUANTUM", "20"))
 
 # At `agent-teams up`, if local git HEAD is behind `main`, upgrade in place and
 # re-exec BEFORE agents start (never interrupts in-flight work). ON by default so
 # fixes pushed to `main` reach every install on its next start with no user action;
-# set SWARM_AUTO_UPDATE=0 (or false/no) to opt out. No-op inside Docker (the image
-# is rebuilt instead). See _maybe_auto_update() in swarm_server/cli.py.
+# set TEAMS_AUTO_UPDATE=0 (or false/no) to opt out. No-op inside Docker (the image
+# is rebuilt instead). See _maybe_auto_update() in teams_server/cli.py.
 AUTO_UPDATE_ENABLED = os.environ.get(
-    "SWARM_AUTO_UPDATE", "1").lower() not in ("0", "false", "no")
+    "TEAMS_AUTO_UPDATE", "1").lower() not in ("0", "false", "no")
 
 # Supervisor counterpart: a supervisor's history is dominated by its own past
 # sweep PAYLOADS (user-side team feeds — measured 96% of one overseer's session
@@ -355,9 +355,9 @@ AUTO_UPDATE_ENABLED = os.environ.get(
 # SWEEP_PAYLOAD_KEEP_RECENT payloads are stubbed from the marker onward; the
 # supervisor's own verdicts stay verbatim.
 SWEEP_PAYLOAD_AGE_ENABLED = os.environ.get(
-    "SWARM_SWEEP_PAYLOAD_AGE_ENABLED", "1").lower() not in ("0", "false", "no")
-SWEEP_PAYLOAD_KEEP_RECENT = int(os.environ.get("SWARM_SWEEP_PAYLOAD_KEEP_RECENT", "2"))
-SWEEP_PAYLOAD_MIN_CHARS = int(os.environ.get("SWARM_SWEEP_PAYLOAD_MIN_CHARS", "500"))
+    "TEAMS_SWEEP_PAYLOAD_AGE_ENABLED", "1").lower() not in ("0", "false", "no")
+SWEEP_PAYLOAD_KEEP_RECENT = int(os.environ.get("TEAMS_SWEEP_PAYLOAD_KEEP_RECENT", "2"))
+SWEEP_PAYLOAD_MIN_CHARS = int(os.environ.get("TEAMS_SWEEP_PAYLOAD_MIN_CHARS", "500"))
 
 # ---------------------------------------------------------------------------
 # Live-context size caps. The live block is rebuilt fresh each turn AND rides
@@ -365,10 +365,10 @@ SWEEP_PAYLOAD_MIN_CHARS = int(os.environ.get("SWARM_SWEEP_PAYLOAD_MIN_CHARS", "5
 # dozens of times per turn. Keep it a digest, not a dump — anything an agent
 # needs in full it can read from the shared store.
 # ---------------------------------------------------------------------------
-LIVE_CTX_TREE_MAX_ENTRIES = int(os.environ.get("SWARM_LIVE_CTX_TREE_MAX_ENTRIES", "60"))
-LIVE_CTX_PEER_MESSAGES = int(os.environ.get("SWARM_LIVE_CTX_PEER_MESSAGES", "6"))
-LIVE_CTX_DECISIONS = int(os.environ.get("SWARM_LIVE_CTX_DECISIONS", "12"))
-LIVE_CTX_COMPLETED = int(os.environ.get("SWARM_LIVE_CTX_COMPLETED", "5"))
+LIVE_CTX_TREE_MAX_ENTRIES = int(os.environ.get("TEAMS_LIVE_CTX_TREE_MAX_ENTRIES", "60"))
+LIVE_CTX_PEER_MESSAGES = int(os.environ.get("TEAMS_LIVE_CTX_PEER_MESSAGES", "6"))
+LIVE_CTX_DECISIONS = int(os.environ.get("TEAMS_LIVE_CTX_DECISIONS", "12"))
+LIVE_CTX_COMPLETED = int(os.environ.get("TEAMS_LIVE_CTX_COMPLETED", "5"))
 
 # ---------------------------------------------------------------------------
 # Disabled toolsets — removed from every agent's tool schema at init.
@@ -376,7 +376,7 @@ LIVE_CTX_COMPLETED = int(os.environ.get("SWARM_LIVE_CTX_COMPLETED", "5"))
 # Hermes ships ~71 tools across many toolsets; every enabled tool's JSON schema
 # is re-sent on EVERY turn (measured ~11k tokens for the default selection) and
 # several toolsets also inject a multi-hundred-token guidance block into the
-# system prompt. This swarm only ever uses browser + terminal/code + file ops +
+# system prompt. This teams only ever uses browser + terminal/code + file ops +
 # web search + memory/todo + its own custom peer/escalation tools, so we disable
 # the rest. This trims per-turn tool-schema tokens and removes the skills /
 # session_search guidance blocks.
@@ -395,7 +395,7 @@ DISABLED_TOOLSETS: List[str] = [
     "image_gen", "video_gen", "video",  # media generation — not used
     "spotify", "homeassistant", "discord", "discord_admin",
     "feishu_doc", "feishu_drive", "hermes-yuanbao",
-    "moa", "messaging",  # third-party integrations the swarm never calls
+    "moa", "messaging",  # third-party integrations the teams never calls
 ]
 
 # ---------------------------------------------------------------------------
@@ -410,7 +410,7 @@ LLM_ERROR_EMIT_THROTTLE_SECONDS = 60  # min gap between "provider unreachable" U
 # ran a 49-tool-call turn, monopolizing its thread and evading per-turn review
 # (supervisors/digests see activity between turns). 40 is generous for real
 # work; a task that genuinely needs more should be split across turns anyway.
-DEFAULT_MAX_ITERATIONS = int(os.environ.get("SWARM_MAX_ITERATIONS", "40"))
+DEFAULT_MAX_ITERATIONS = int(os.environ.get("TEAMS_MAX_ITERATIONS", "40"))
 
 # ---------------------------------------------------------------------------
 # Adaptive idle heartbeat (24/7 autonomy without idle burn)
@@ -421,7 +421,7 @@ DEFAULT_MAX_ITERATIONS = int(os.environ.get("SWARM_MAX_ITERATIONS", "40"))
 # a concrete action resets it. This resolves the old two-failure-modes-on-one-
 # knob problem: heartbeat off => the org goes dormant; fixed-interval heartbeat
 # on => idle token burn + invented busywork all night.
-HEARTBEAT_BACKOFF_MAX_DOUBLINGS = int(os.environ.get("SWARM_HEARTBEAT_BACKOFF_MAX", "4"))
+HEARTBEAT_BACKOFF_MAX_DOUBLINGS = int(os.environ.get("TEAMS_HEARTBEAT_BACKOFF_MAX", "4"))
 
 # ---------------------------------------------------------------------------
 # Per-agent cross-turn repetition guard (self-loop detector)
@@ -432,16 +432,16 @@ HEARTBEAT_BACKOFF_MAX_DOUBLINGS = int(os.environ.get("SWARM_HEARTBEAT_BACKOFF_MA
 # supervisor happens to review. The daemon tracks normalized per-turn tool-call
 # signatures; when one signature repeats in SELF_LOOP_REPEATS of the last
 # SELF_LOOP_WINDOW turns, ONE corrective task is injected (cooldown-limited).
-SELF_LOOP_REPEATS = int(os.environ.get("SWARM_SELF_LOOP_REPEATS", "3"))
-SELF_LOOP_WINDOW = int(os.environ.get("SWARM_SELF_LOOP_WINDOW", "5"))
-SELF_LOOP_COOLDOWN_SECONDS = int(os.environ.get("SWARM_SELF_LOOP_COOLDOWN", "1800"))
+SELF_LOOP_REPEATS = int(os.environ.get("TEAMS_SELF_LOOP_REPEATS", "3"))
+SELF_LOOP_WINDOW = int(os.environ.get("TEAMS_SELF_LOOP_WINDOW", "5"))
+SELF_LOOP_COOLDOWN_SECONDS = int(os.environ.get("TEAMS_SELF_LOOP_COOLDOWN", "1800"))
 
 # ---------------------------------------------------------------------------
 # Browser tools
 # ---------------------------------------------------------------------------
 # Hermes gates the browser toolset (browser_* + web_search) behind
 # check_browser_requirements(): it needs EITHER a configured cloud provider OR
-# a local Chromium. The swarm server doesn't load ~/.hermes/.env, so the
+# a local Chromium. The teams server doesn't load ~/.hermes/.env, so the
 # auto-selected cloud provider (Firecrawl) reports unconfigured and short-
 # circuits the check to False — dropping every browser tool AND web_search.
 # Pinning cloud_provider="local" forces _get_cloud_provider() to return None so
@@ -453,11 +453,11 @@ BROWSER_CLOUD_PROVIDER = "local"
 # How a human browser takeover is presented:
 #   "embedded" (default) — the team browser stays HEADLESS; the human drives it
 #       through a live view streamed into the dashboard (works on a display-less
-#       VPS). See swarm_server/browser_stream.py.
+#       VPS). See teams_server/browser_stream.py.
 #   "window" — legacy behaviour: relaunch the team browser as a real visible
 #       Chrome window on the HOST's desktop (only works where the server has a
 #       display, e.g. a developer's own machine).
-SWARM_TAKEOVER_MODE = os.environ.get("SWARM_TAKEOVER_MODE", "embedded").strip().lower()
+TEAMS_TAKEOVER_MODE = os.environ.get("TEAMS_TAKEOVER_MODE", "embedded").strip().lower()
 
 # ---------------------------------------------------------------------------
 # Monitoring retention — rolling cap so monitoring.db stays bounded over 24/7 runs
@@ -486,48 +486,48 @@ MONITORING_PRUNE_INTERVAL_SECONDS = 300
 # (time). Idle agents (no new messages since the last digest) are skipped
 # entirely, so a quiet team costs ~nothing.
 # ---------------------------------------------------------------------------
-# Default cheap model for digests. Empty => fall back to the swarm default model
+# Default cheap model for digests. Empty => fall back to the teams default model
 # (DEFAULT_MODEL). The effective value is overridable live from the UI and
 # stored in the global "settings" block (see get_global_settings()).
-SUMMARY_MODEL = os.environ.get("SWARM_SUMMARY_MODEL", "").strip()
+SUMMARY_MODEL = os.environ.get("TEAMS_SUMMARY_MODEL", "").strip()
 # How often the background loop sweeps agents for digest-eligibility.
-DIGEST_SWEEP_INTERVAL_SECONDS = int(os.environ.get("SWARM_DIGEST_INTERVAL_SECONDS", "120"))
+DIGEST_SWEEP_INTERVAL_SECONDS = int(os.environ.get("TEAMS_DIGEST_INTERVAL_SECONDS", "120"))
 # Volume trigger: digest once an agent accrues this many new estimated tokens.
-DIGEST_MIN_NEW_TOKENS = int(os.environ.get("SWARM_DIGEST_MIN_NEW_TOKENS", "4000"))
+DIGEST_MIN_NEW_TOKENS = int(os.environ.get("TEAMS_DIGEST_MIN_NEW_TOKENS", "4000"))
 # Time trigger: digest if at least this long has passed since the last digest
 # AND there is any new activity (even below the volume threshold).
-DIGEST_MAX_AGE_SECONDS = int(os.environ.get("SWARM_DIGEST_MAX_AGE_SECONDS", "900"))
+DIGEST_MAX_AGE_SECONDS = int(os.environ.get("TEAMS_DIGEST_MAX_AGE_SECONDS", "900"))
 # Hard cap on transcript characters fed to the summarizer in one pass; on a
 # burst we keep the most-recent slice and note the truncation (no silent loss).
-DIGEST_INPUT_CHAR_CAP = int(os.environ.get("SWARM_DIGEST_INPUT_CHAR_CAP", "24000"))
+DIGEST_INPUT_CHAR_CAP = int(os.environ.get("TEAMS_DIGEST_INPUT_CHAR_CAP", "24000"))
 # Master on/off; overridable live from the UI (global "settings" block).
-DIGEST_ENABLED_DEFAULT = os.environ.get("SWARM_DIGEST_ENABLED", "1") not in ("0", "false", "False", "")
+DIGEST_ENABLED_DEFAULT = os.environ.get("TEAMS_DIGEST_ENABLED", "1") not in ("0", "false", "False", "")
 
 # ---------------------------------------------------------------------------
-# Global loop detector (Layer 5 — emergent, swarm-wide). Per-agent supervision
+# Global loop detector (Layer 5 — emergent, teams-wide). Per-agent supervision
 # can't see a loop that spans agents (A↔B↔C ping-pong); this watches the whole
 # team's message graph and nudges to break a no-progress storm.
 # ---------------------------------------------------------------------------
-LOOP_DETECT_ENABLED = os.environ.get("SWARM_LOOP_DETECT", "1") not in ("0", "false", "False", "")
-LOOP_SWEEP_INTERVAL_SECONDS = int(os.environ.get("SWARM_LOOP_SWEEP_SECONDS", "120"))
+LOOP_DETECT_ENABLED = os.environ.get("TEAMS_LOOP_DETECT", "1") not in ("0", "false", "False", "")
+LOOP_SWEEP_INTERVAL_SECONDS = int(os.environ.get("TEAMS_LOOP_SWEEP_SECONDS", "120"))
 # Window of recent message history each scan considers.
-LOOP_WINDOW_SECONDS = int(os.environ.get("SWARM_LOOP_WINDOW_SECONDS", "600"))
+LOOP_WINDOW_SECONDS = int(os.environ.get("TEAMS_LOOP_WINDOW_SECONDS", "600"))
 # A single pair (A↔B) trading at least this many WAKING messages in the window,
 # with mostly repeated content, is a ping-pong loop.
-LOOP_PAIR_THRESHOLD = int(os.environ.get("SWARM_LOOP_PAIR_THRESHOLD", "6"))
+LOOP_PAIR_THRESHOLD = int(os.environ.get("TEAMS_LOOP_PAIR_THRESHOLD", "6"))
 # The team sending at least this many messages in the window while logging ZERO
 # decisions AND ZERO actions is a team-wide stall ("everyone talks, nobody ships").
-LOOP_TEAM_MSG_THRESHOLD = int(os.environ.get("SWARM_LOOP_TEAM_MSG_THRESHOLD", "14"))
+LOOP_TEAM_MSG_THRESHOLD = int(os.environ.get("TEAMS_LOOP_TEAM_MSG_THRESHOLD", "14"))
 # Don't re-alert the same signature within this cooldown.
-LOOP_ALERT_COOLDOWN_SECONDS = int(os.environ.get("SWARM_LOOP_COOLDOWN_SECONDS", "900"))
+LOOP_ALERT_COOLDOWN_SECONDS = int(os.environ.get("TEAMS_LOOP_COOLDOWN_SECONDS", "900"))
 
 # ---------------------------------------------------------------------------
 # Decision-log rollup. The prompt injects the last DECISION_LIVE_WINDOW decisions;
 # once unrolled decisions exceed DECISION_ROLLUP_TRIGGER, the oldest beyond the
 # live window are summarized into a milestone so long-term memory isn't lost.
 # ---------------------------------------------------------------------------
-DECISION_LIVE_WINDOW = int(os.environ.get("SWARM_DECISION_LIVE_WINDOW", "20"))
-DECISION_ROLLUP_TRIGGER = int(os.environ.get("SWARM_DECISION_ROLLUP_TRIGGER", "40"))
+DECISION_LIVE_WINDOW = int(os.environ.get("TEAMS_DECISION_LIVE_WINDOW", "20"))
+DECISION_ROLLUP_TRIGGER = int(os.environ.get("TEAMS_DECISION_ROLLUP_TRIGGER", "40"))
 
 # ---------------------------------------------------------------------------
 # Supervisor agents (Layer 4 observability)
@@ -550,14 +550,14 @@ DECISION_ROLLUP_TRIGGER = int(os.environ.get("SWARM_DECISION_ROLLUP_TRIGGER", "4
 # single-peer, and silence-blind: an idle agent sitting on an open delegation
 # never generated tokens, so it was never reviewed.
 SUPERVISOR_SWEEP_INTERVAL_MINUTES = float(
-    os.environ.get("SWARM_SUPERVISOR_SWEEP_MINUTES", "20"))
+    os.environ.get("TEAMS_SUPERVISOR_SWEEP_MINUTES", "20"))
 # Total char budget for one sweep prompt, split across the peers that were
 # active this window (each peer keeps its most-recent slice, truncation noted).
-SUPERVISOR_SWEEP_CHAR_CAP = int(os.environ.get("SWARM_SUPERVISOR_SWEEP_CHAR_CAP", "32000"))
+SUPERVISOR_SWEEP_CHAR_CAP = int(os.environ.get("TEAMS_SUPERVISOR_SWEEP_CHAR_CAP", "32000"))
 # Floor for one active peer's slice so a noisy teammate can't starve the rest
 # below readability.
 SUPERVISOR_SWEEP_PER_PEER_FLOOR = int(
-    os.environ.get("SWARM_SUPERVISOR_SWEEP_PER_PEER_FLOOR", "2000"))
+    os.environ.get("TEAMS_SUPERVISOR_SWEEP_PER_PEER_FLOOR", "2000"))
 # Idle-skip: when NO watched peer logged a single message since the last sweep,
 # skip queueing one (a skipped sweep costs ~6 SQL rows; a queued all-IDLE sweep
 # was measured at a full ~85k-token LLM turn). Never go silence-blind though —
@@ -567,12 +567,12 @@ SUPERVISOR_SWEEP_PER_PEER_FLOOR = int(
 # early (rate-limited to once per age window, so a permanently parked item
 # can't degenerate back to sweeping every interval).
 SUPERVISOR_SWEEP_MAX_IDLE_SKIPS = int(
-    os.environ.get("SWARM_SUPERVISOR_SWEEP_MAX_IDLE_SKIPS", "3"))
+    os.environ.get("TEAMS_SUPERVISOR_SWEEP_MAX_IDLE_SKIPS", "3"))
 SUPERVISOR_SWEEP_FORCE_OPEN_AGE_SECONDS = int(
-    os.environ.get("SWARM_SUPERVISOR_SWEEP_FORCE_OPEN_AGE_SECONDS", "7200"))
+    os.environ.get("TEAMS_SUPERVISOR_SWEEP_FORCE_OPEN_AGE_SECONDS", "7200"))
 # Legacy single-review cap; still the default char_cap of _render_feed_transcript.
-SUPERVISOR_FEED_CHAR_CAP = int(os.environ.get("SWARM_SUPERVISOR_FEED_CHAR_CAP", "24000"))
-# SUPERVISOR_SWEEP_PROMPT and SUPERVISOR_DEFAULT_SOUL live in swarm_server/prompts.py.
+SUPERVISOR_FEED_CHAR_CAP = int(os.environ.get("TEAMS_SUPERVISOR_FEED_CHAR_CAP", "24000"))
+# SUPERVISOR_SWEEP_PROMPT and SUPERVISOR_DEFAULT_SOUL live in teams_server/prompts.py.
 
 # Human-inbox registry cap (in-memory) — drop oldest resolved questions past this.
 MAX_PENDING_QUESTIONS = 500
@@ -582,18 +582,18 @@ MAX_PENDING_QUESTIONS = 500
 # ---------------------------------------------------------------------------
 # The dashboard is served same-origin, so it needs no CORS at all; restricting to
 # localhost drops the spec-invalid wildcard+credentials combo. Override with the
-# SWARM_CORS_ORIGINS env var (comma-separated) if hosting the UI elsewhere.
+# TEAMS_CORS_ORIGINS env var (comma-separated) if hosting the UI elsewhere.
 CORS_ALLOWED_ORIGINS = [
     o.strip()
     for o in os.environ.get(
-        "SWARM_CORS_ORIGINS",
+        "TEAMS_CORS_ORIGINS",
         f"http://{SERVER_HOST}:{SERVER_PORT},http://localhost:{SERVER_PORT}",
     ).split(",")
     if o.strip()
 ]
 # Optional bearer token guarding mutating endpoints. Unset => auth disabled
-# (relies on localhost binding). Set SWARM_API_KEY to require it.
-SWARM_API_KEY = os.environ.get("SWARM_API_KEY", "").strip()
+# (relies on localhost binding). Set TEAMS_API_KEY to require it.
+TEAMS_API_KEY = os.environ.get("TEAMS_API_KEY", "").strip()
 # ---------------------------------------------------------------------------
 # New config schema helpers
 # ---------------------------------------------------------------------------
@@ -681,7 +681,7 @@ def write_agent_hermes_config(
     keyed per path), so this must be written BEFORE the agent is constructed.
 
     Existing keys are preserved; only the compression-relevant sections are
-    (re)written so the values stay in sync with the swarm constants above.
+    (re)written so the values stay in sync with the teams constants above.
     """
     import yaml
 
@@ -725,7 +725,7 @@ def write_agent_hermes_config(
     if on_openai_compatible:
         # Endpoint hides the model → pin a conservative window. Below the real
         # window only compacts sooner (safe); above it risks a hard overflow
-        # before Hermes ever compacts. Tune via SWARM/AGENT_CONTEXT_WINDOW.
+        # before Hermes ever compacts. Tune via TEAMS/AGENT_CONTEXT_WINDOW.
         model_section["context_length"] = AGENT_CONTEXT_WINDOW
         model_section["base_url"] = eff_base
     else:
@@ -825,7 +825,7 @@ def write_agent_hermes_config(
         # terminal commands and joined the very loop it was meant to police).
         # Physically remove the action toolsets so a supervisor structurally CANNOT
         # run commands, browse, execute code, web-search, or spawn sub-agents. It
-        # keeps file-read, memory, and the swarm tools (send_peer_message,
+        # keeps file-read, memory, and the teams tools (send_peer_message,
         # pause_agent, log_decision, ask_human) — everything oversight needs and
         # nothing project work needs.
         _disabled += [t for t in
@@ -865,11 +865,11 @@ def write_agent_hermes_config(
         #
         # ⚠ NOT HONORED by the installed Hermes (>=0.15.2): browser_supervisor.
         # _attach_initial_page adopts the first page target unconditionally and
-        # never reads this key — there is no swarm monkeypatch applying it. We
+        # never reads this key — there is no teams monkeypatch applying it. We
         # still WRITE the key so it activates automatically if/when Hermes (or an
         # upstream patch) honors it; until then, two agents in a team that browse
         # at the same time can land on the SAME tab. The real fix is upstream
-        # (Hermes honoring the flag) or a swarm-owned per-tab CDP handoff — both
+        # (Hermes honoring the flag) or a teams-owned per-tab CDP handoff — both
         # need concurrent-browser verification. Tracked as a known limitation.
         browser_section["fresh_tab_per_task"] = True
         existing["browser"] = browser_section
@@ -953,7 +953,7 @@ def _migrate_v1_to_v2(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 if not line_stripped:
                     continue
                 if any(x in line_stripped for x in ["send_peer_message", "ask_human", "operate autonomously",
-                                                      "swarm rules", "communication protocol", "tool guidance",
+                                                      "teams rules", "communication protocol", "tool guidance",
                                                       "You are an autonomous agent", "NEVER end your turn"]):
                     continue
                 role_lines.append(line_stripped)
@@ -1243,10 +1243,10 @@ def create_agent(
         raise ValueError(f"Team '{team_id}' does not exist")
 
     # A supervisor with no custom soul gets the default supervisor identity.
-    # Local import: prompt text lives in swarm_server.prompts, which imports
+    # Local import: prompt text lives in teams_server.prompts, which imports
     # path/config helpers from this module — a function-local import here keeps
     # that one-directional (no config -> prompts top-level cycle).
-    from swarm_server.prompts import SUPERVISOR_DEFAULT_SOUL
+    from teams_server.prompts import SUPERVISOR_DEFAULT_SOUL
     default_soul = SUPERVISOR_DEFAULT_SOUL if is_supervisor else f"You are the {display_name}."
     agent_cfg = {
         "team_id": team_id,
@@ -1291,7 +1291,7 @@ def delete_agent(cfg: Dict[str, Any], name: str) -> bool:
 def set_agent_peers(cfg: Dict[str, Any], name: str, peers: List[str]) -> Dict[str, Any]:
     """Set agent ``name``'s peer list to EXACTLY ``peers``, BIDIRECTIONALLY.
 
-    All swarm connections are bidirectional: a link is stored on both agents'
+    All teams connections are bidirectional: a link is stored on both agents'
     ``allowed_peers`` and authorizes messaging either way. This setter therefore
     syncs the reverse side too — it adds ``name`` to every new peer and removes
     ``name`` from any agent that is no longer a peer — so there is never a
@@ -1448,15 +1448,15 @@ def peer_allowed(cfg: Dict[str, Any], caller: str, target: str) -> bool:
 # string is validated with cron.cron_validate before it is ever stored.
 import uuid as _uuid
 
-MAX_CRONS_PER_AGENT = int(os.environ.get("SWARM_MAX_CRONS_PER_AGENT", "25"))
+MAX_CRONS_PER_AGENT = int(os.environ.get("TEAMS_MAX_CRONS_PER_AGENT", "25"))
 
 # A cron instruction must stay GOAL-level. Long step-by-step scripts freeze a
 # moment in time and the agent re-executes the stale script verbatim forever
 # (observed: a 1.7k-char daily-checkin script pinned founder to June-10 state).
 # Agents get a tight cap; humans a looser one (dashboard paste). Detailed
 # procedures belong in a workspace runbook file the instruction references.
-MAX_CRON_INSTRUCTION_CHARS_AGENT = int(os.environ.get("SWARM_MAX_CRON_INSTRUCTION_CHARS_AGENT", "600"))
-MAX_CRON_INSTRUCTION_CHARS_HUMAN = int(os.environ.get("SWARM_MAX_CRON_INSTRUCTION_CHARS_HUMAN", "4000"))
+MAX_CRON_INSTRUCTION_CHARS_AGENT = int(os.environ.get("TEAMS_MAX_CRON_INSTRUCTION_CHARS_AGENT", "600"))
+MAX_CRON_INSTRUCTION_CHARS_HUMAN = int(os.environ.get("TEAMS_MAX_CRON_INSTRUCTION_CHARS_HUMAN", "4000"))
 
 _CRON_INSTRUCTION_TOO_LONG = (
     "Instruction too long ({n} chars > {cap}). Keep cron instructions GOAL-level: "
@@ -1482,20 +1482,20 @@ def _validate_cron_instruction(instruction: str, created_by: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Global swarm settings (top-level "settings" block in agents_config.json).
+# Global teams settings (top-level "settings" block in agents_config.json).
 # Survives restarts; deep-copied with the rest of the config. Used for the
 # UI-configurable digest summary model + on/off, etc. Unknown/legacy configs
 # simply have no "settings" key and fall back to the env/code defaults.
 # ---------------------------------------------------------------------------
 _GLOBAL_SETTINGS_DEFAULTS = {
-    # "" => use the swarm default model (DEFAULT_MODEL) for digests.
+    # "" => use the teams default model (DEFAULT_MODEL) for digests.
     "summary_model": SUMMARY_MODEL,
     "digest_enabled": DIGEST_ENABLED_DEFAULT,
     # Multimodal model for screenshot reading + GUI grounding (browser_vision,
     # browser_locate). "" => the VISION_MODEL env/code default. UI-settable;
     # written into every agent's auxiliary.vision config on re-init.
     "vision_model": "",
-    # "" => the Architect (master team-builder) uses the swarm default model.
+    # "" => the Architect (master team-builder) uses the teams default model.
     "master_model": "",
 }
 
@@ -1556,7 +1556,7 @@ def get_vision_model() -> str:
 # a restart re-probes after a proxy remap).
 _VISION_PROBE_CACHE: Dict[tuple, bool] = {}
 _VISION_PROBE_LOCK = threading.Lock()
-VISION_PROBE_TIMEOUT_SECONDS = float(os.environ.get("SWARM_VISION_PROBE_TIMEOUT", "15"))
+VISION_PROBE_TIMEOUT_SECONDS = float(os.environ.get("TEAMS_VISION_PROBE_TIMEOUT", "15"))
 
 
 def _probe_png() -> bytes:
@@ -1695,7 +1695,7 @@ def add_agent_cron(
     (None = recurs indefinitely). Set ``max_runs=1`` for a ONE-TIME future task
     — without it, a schedule meant to run once recurs forever and keeps pulling
     the agent back to it (see record_cron_fire / _maybe_fire_crons)."""
-    from swarm_server.cron import cron_validate
+    from teams_server.cron import cron_validate
 
     instruction = _validate_cron_instruction(instruction, created_by)
     ok, norm = cron_validate(schedule or "")
@@ -1760,7 +1760,7 @@ def update_agent_cron(
     cfg: Dict[str, Any], name: str, cron_id: str, fields: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Patch an existing cron (schedule / instruction / enabled). Returns the entry."""
-    from swarm_server.cron import cron_validate
+    from teams_server.cron import cron_validate
 
     a = cfg["agents"].get(name)
     if a is None:

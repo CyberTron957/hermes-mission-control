@@ -1,4 +1,4 @@
-"""Layer-5 observability: a swarm-wide loop detector.
+"""Layer-5 observability: a teams-wide loop detector.
 
 Per-agent supervision (Layer 4) feeds each supervisor ONE peer's transcript, so
 a loop that spans agents — ceo↔cgo↔cto trading confirmations, or a whole team
@@ -24,15 +24,15 @@ import re
 import time
 from typing import Callable, Dict, List, Optional
 
-from swarm_server.config import (
+from teams_server.config import (
     LOOP_ALERT_COOLDOWN_SECONDS,
     LOOP_PAIR_THRESHOLD,
     LOOP_TEAM_MSG_THRESHOLD,
     LOOP_WINDOW_SECONDS,
 )
-from swarm_server.monitoring import monitor_db
+from teams_server.monitoring import monitor_db
 
-log = logging.getLogger("swarm.loopdetector")
+log = logging.getLogger("teams.loopdetector")
 
 _WAKING = {"TASK", "QUESTION", "RESULT"}
 
@@ -125,7 +125,7 @@ def _fire(signature: str, now: float) -> bool:
 
 def _broadcast(event: str, payload: dict) -> None:
     try:
-        from swarm_server.websocket import _broadcast as _b
+        from teams_server.websocket import _broadcast as _b
         _b(event, payload)
     except Exception:
         pass

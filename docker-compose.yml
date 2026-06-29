@@ -1,24 +1,24 @@
 services:
-  swarm:
+  teams:
     build: .
     image: agent-teams:latest
     env_file:
-      # Optional: provider keys / SWARM_API_KEY etc. A fresh clone has no .env
+      # Optional: provider keys / TEAMS_API_KEY etc. A fresh clone has no .env
       # (it's gitignored) — `required: false` lets `docker compose up` work
       # without one. Copy .env.example → .env to use it.
       - path: .env
         required: false
     environment:
       # Set by the image, repeated here for clarity / override.
-      SWARM_HOST: "0.0.0.0"
-      SWARM_DATA_DIR: "/data"
+      TEAMS_HOST: "0.0.0.0"
+      TEAMS_DATA_DIR: "/data"
     ports:
       # localhost-only by default. To expose on the LAN, change to "8000:8000"
-      # AND set SWARM_API_KEY in .env — it guards every endpoint + the
+      # AND set TEAMS_API_KEY in .env — it guards every endpoint + the
       # WebSocket, and the dashboard prompts for the key on first load.
       - "127.0.0.1:8000:8000"
     volumes:
-      - swarm-data:/data
+      - teams-data:/data
       # Adopt an existing host Hermes setup (provider + tool API keys) without
       # reconfiguring: uncomment to mount it read-only. The container reads
       # ~/.hermes as a fallback and imports its .env secrets on startup.
@@ -31,4 +31,4 @@ services:
       - "host.docker.internal:host-gateway"
 
 volumes:
-  swarm-data:
+  teams-data:

@@ -31,7 +31,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from swarm_server.prompts import (  # noqa: E402
+from teams_server.prompts import (  # noqa: E402
     AUTONOMOUS_HEARTBEAT_PROMPT,
     COMMON_SOUL_TEMPLATE,
     CRON_WAKEUP_PROMPT,
@@ -45,8 +45,8 @@ from swarm_server.prompts import (  # noqa: E402
     compose_agent_soul,
     strip_stale_live_context,
 )
-from swarm_server.monitoring import MonitoringDB  # noqa: E402
-from swarm_server.queue import TaskQueue  # noqa: E402
+from teams_server.monitoring import MonitoringDB  # noqa: E402
+from teams_server.queue import TaskQueue  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ def test_strip_never_eats_plain_messages():
 # 2. Repetition guard
 # ---------------------------------------------------------------------------
 def test_detect_repeated_signature():
-    from swarm_server.agent import detect_repeated_signature
+    from teams_server.agent import detect_repeated_signature
 
     hist = [["read(a.txt)"], ["read(a.txt)", "grep(x)"], ["read(a.txt)"]]
     assert detect_repeated_signature(hist, repeats=3, window=5) == "read(a.txt)"
@@ -118,7 +118,7 @@ def test_detect_repeated_signature():
 
 
 def test_turn_tool_signatures_normalization():
-    from swarm_server.agent import _turn_tool_signatures
+    from teams_server.agent import _turn_tool_signatures
 
     msgs = [
         {"role": "assistant", "tool_calls": [
@@ -200,8 +200,8 @@ def test_recently_closed_delegations(tmp_path):
 # 6. Heartbeat backoff
 # ---------------------------------------------------------------------------
 def test_heartbeat_backoff_doubles_and_caps():
-    from swarm_server.agent import AgentDaemon
-    from swarm_server.config import HEARTBEAT_BACKOFF_MAX_DOUBLINGS
+    from teams_server.agent import AgentDaemon
+    from teams_server.config import HEARTBEAT_BACKOFF_MAX_DOUBLINGS
 
     base = 600.0
     assert AgentDaemon.effective_heartbeat_interval(base, 0) == 600.0
@@ -245,9 +245,9 @@ def test_soul_compose_substitutes_placeholders():
 # 8. Live context: sentinels + new sections
 # ---------------------------------------------------------------------------
 def test_compose_live_context_sentinels_and_sections(tmp_path, monkeypatch):
-    import swarm_server.monitoring as monitoring
-    import swarm_server.prompts as prompts
-    import swarm_server.tools as tools
+    import teams_server.monitoring as monitoring
+    import teams_server.prompts as prompts
+    import teams_server.tools as tools
 
     db = MonitoringDB(tmp_path / "mon.db")
     db.open_delegation("o1", "lead", "tester", "TASK", summary="open item", team_id="t1")

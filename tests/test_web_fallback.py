@@ -2,7 +2,7 @@
 backend the user actually configured.
 
 Hermes ships a multi-backend web system (firecrawl/tavily/exa/ddgs/…). Our
-crawl4ai/httpx fallback (swarm_server.web_crawl4ai) should only override a
+crawl4ai/httpx fallback (teams_server.web_crawl4ai) should only override a
 capability when Hermes has no provider for it — otherwise a user who configured
 (and pays for) firecrawl would silently get downgraded to a raw HTTP fetch.
 
@@ -18,7 +18,7 @@ import types
 
 import pytest
 
-import swarm_server.web_crawl4ai as wc
+import teams_server.web_crawl4ai as wc
 
 
 class _FakeProvider:
@@ -148,7 +148,7 @@ def test_httpx_fallback_returns_content():
     """The httpx fetch path (used when crawl4ai isn't installed) must return clean
     text, so a fresh `pip install` without the [web] extra still extracts pages.
     Patches tools.web_tools-independent httpx via the module's lazy import."""
-    import swarm_server.web_crawl4ai as mod
+    import teams_server.web_crawl4ai as mod
 
     class _Resp:
         text = "<html><head><style>x{}</style></head><body>Hello <b>World</b></body></html>"

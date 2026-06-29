@@ -6,14 +6,14 @@ import os
 import sys
 
 def main():
-    print("Starting swarm server...")
-    # Run test_swarm.py in the background
+    print("Starting teams server...")
+    # Run test_teams.py in the background
     env = {
         **os.environ,
         "PYTHONPATH": os.environ.get("HERMES_AGENT_PATH", os.path.expanduser("~/.hermes/hermes-agent"))
     }
     server_process = subprocess.Popen(
-        [sys.executable, "-u", "test_swarm.py"],
+        [sys.executable, "-u", "test_teams.py"],
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

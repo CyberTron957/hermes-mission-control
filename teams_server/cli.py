@@ -1,7 +1,7 @@
 """``agent-teams`` command-line entry point.
 
 Subcommands:
-  agent-teams up        Run the swarm server + dashboard (default)
+  agent-teams up        Run the teams server + dashboard (default)
   agent-teams down      Stop a server started with `up` (incl. detached)
   agent-teams status    Is the server running? show URL + health
   agent-teams setup     Full interactive provider/tool wizard (`hermes setup`)
@@ -9,7 +9,7 @@ Subcommands:
   agent-teams init      Scaffold a starter team + coordinator agent
   agent-teams doctor    Check Hermes, the model backend, and Chromium
 
-Installed as a console script via pyproject (``agent-teams = swarm_server.cli:main``).
+Installed as a console script via pyproject (``agent-teams = teams_server.cli:main``).
 """
 
 import argparse
@@ -22,8 +22,8 @@ import sys
 # Running-server tracking (pidfile) so `down`/`status` work for a detached `up`.
 # ---------------------------------------------------------------------------
 def _pidfile_path():
-    from swarm_server.config import DATA_ROOT
-    return DATA_ROOT / "swarm.pid"
+    from teams_server.config import DATA_ROOT
+    return DATA_ROOT / "teams.pid"
 
 
 def _write_pidfile() -> None:
@@ -70,7 +70,7 @@ def _probe_health(host: str, port: int, timeout: float = 1.5) -> bool:
 
 
 def _setup_logging() -> None:
-    from swarm_server.config import configure_logging
+    from teams_server.config import configure_logging
     configure_logging()
 
 
@@ -83,12 +83,12 @@ BANNER = r"""
  |_|  |_|\___|_|  |_| |_| |_|\___||___/|_____/  \_/\_/ \__,_|_|  |_| |_| |_|   
 
     Commands:
-      • Start Swarm (FG):  agent-teams up
+      • Start Teams (FG):  agent-teams up
       • Start (Detached):  agent-teams up --detach
-      • Stop Swarm:        agent-teams down
+      • Stop Teams:        agent-teams down
       • Check Status:      agent-teams status
       • Configuration:     agent-teams setup
-      • Swarm Doctor:      agent-teams doctor
+      • Teams Doctor:      agent-teams doctor
 """
 
 def print_banner() -> None:
@@ -117,17 +117,17 @@ def _maybe_auto_update() -> None:
 
     Commit-driven (not version-driven): any new commit on `main` — a hotfix with
     no version bump, or a tagged release — is applied. Runs before agents start, so
-    it never interrupts in-flight work; on by default (SWARM_AUTO_UPDATE=0 opts out).
+    it never interrupts in-flight work; on by default (TEAMS_AUTO_UPDATE=0 opts out).
     No-op outside a git checkout (Docker rebuilds the image instead). Guarded by
-    SWARM_DID_AUTOUPDATE so the post-update re-exec can't loop. Any failure (offline,
+    TEAMS_DID_AUTOUPDATE so the post-update re-exec can't loop. Any failure (offline,
     dirty/diverged tree, timeout) is non-fatal — we just start the current version.
     """
     import subprocess
 
-    from swarm_server.config import AUTO_UPDATE_ENABLED, PROJECT_ROOT
-    from swarm_server.update_check import get_install_method
+    from teams_server.config import AUTO_UPDATE_ENABLED, PROJECT_ROOT
+    from teams_server.update_check import get_install_method
 
-    if not AUTO_UPDATE_ENABLED or os.environ.get("SWARM_DID_AUTOUPDATE"):
+    if not AUTO_UPDATE_ENABLED or os.environ.get("TEAMS_DID_AUTOUPDATE"):
         return
     if get_install_method() != "git":
         return  # Docker / non-checkout: no in-place pull
@@ -155,8 +155,8 @@ def _maybe_auto_update() -> None:
             return
         # Re-exec the upgraded code in place. The marker prevents a re-exec loop.
         print("● restarting with the updated version…")
-        os.environ["SWARM_DID_AUTOUPDATE"] = "1"
-        os.execv(sys.executable, [sys.executable, "-m", "swarm_server.cli", *sys.argv[1:]])
+        os.environ["TEAMS_DID_AUTOUPDATE"] = "1"
+        os.execv(sys.executable, [sys.executable, "-m", "teams_server.cli", *sys.argv[1:]])
     except Exception as e:  # never let auto-update block a normal start
         print(f"auto-update skipped ({e}); starting the current version.", file=sys.stderr)
 
@@ -182,7 +182,7 @@ def _start_detached(args) -> int:
     """
     import time
 
-    from swarm_server.config import DATA_ROOT, SERVER_HOST, SERVER_PORT
+    from teams_server.config import DATA_ROOT, SERVER_HOST, SERVER_PORT
 
     if not hasattr(os, "fork"):
         print("--detach needs POSIX fork (Linux/macOS). On Windows, run "
@@ -195,7 +195,7 @@ def _start_detached(args) -> int:
               f"http://{SERVER_HOST}:{SERVER_PORT}/")
         return 0
 
-    log_path = getattr(args, "log", None) or str(DATA_ROOT / "swarm.log")
+    log_path = getattr(args, "log", None) or str(DATA_ROOT / "teams.log")
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
 
     pid = os.fork()
@@ -235,14 +235,14 @@ def _serve(args) -> int:
     """Launch uvicorn serving the FastAPI app (host/port from env)."""
     import uvicorn
 
-    from swarm_server.config import SERVER_HOST, SERVER_PORT
+    from teams_server.config import SERVER_HOST, SERVER_PORT
 
-    log = logging.getLogger("swarm")
+    log = logging.getLogger("teams")
     log.info("=" * 60)
     log.info("  Agent Teams Server")
     log.info("  Dashboard:    http://%s:%s/", SERVER_HOST, SERVER_PORT)
     try:
-        from swarm_server.model_config import resolve_model, is_model_configured
+        from teams_server.model_config import resolve_model, is_model_configured
 
         if is_model_configured():
             eff = resolve_model()
@@ -257,7 +257,7 @@ def _serve(args) -> int:
     _write_pidfile()              # so `down`/`status` find a detached server
     try:
         uvicorn.run(
-            "swarm_server.server:app",
+            "teams_server.server:app",
             host=SERVER_HOST,
             port=SERVER_PORT,
             log_level="info",
@@ -273,7 +273,7 @@ def cmd_down(args) -> int:
     import signal
     import time
 
-    from swarm_server.config import SERVER_HOST, SERVER_PORT
+    from teams_server.config import SERVER_HOST, SERVER_PORT
 
     pid = _running_pid()
     if not pid:
@@ -304,13 +304,13 @@ def cmd_down(args) -> int:
         except OSError:
             pass
     _clear_pidfile()
-    print(f"■ Stopped the swarm server (pid {pid}).")
+    print(f"■ Stopped the teams server (pid {pid}).")
     return 0
 
 
 def cmd_status(args) -> int:
     """Report whether the server is up, its URL, and health."""
-    from swarm_server.config import SERVER_HOST, SERVER_PORT
+    from teams_server.config import SERVER_HOST, SERVER_PORT
 
     pid = _running_pid()
     healthy = _probe_health(SERVER_HOST, SERVER_PORT)
@@ -328,17 +328,17 @@ def cmd_status(args) -> int:
 
 
 def cmd_setup(args) -> int:
-    """Launch the FULL interactive Hermes wizard against the swarm's shared config.
+    """Launch the FULL interactive Hermes wizard against the teams's shared config.
 
     A superset of ``set-model``: besides the provider + model, ``hermes setup``
     configures web-search / vision / browser tool providers, memory, reasoning
     effort, credential rotation, and more. It writes to the same shared home
-    (``data/.hermes-shared``) that the swarm reads as its default, so settings
+    (``data/.hermes-shared``) that the teams reads as its default, so settings
     apply to every agent. Use this when you want more than just the model.
     """
     import subprocess
 
-    from swarm_server.model_config import SHARED_HERMES_HOME
+    from teams_server.model_config import SHARED_HERMES_HOME
 
     SHARED_HERMES_HOME.mkdir(parents=True, exist_ok=True)
     hermes = os.path.join(os.path.dirname(sys.executable), "hermes")
@@ -346,7 +346,7 @@ def cmd_setup(args) -> int:
         hermes = "hermes"                      # fall back to PATH
     # Hermes reads HERMES_HOME from the environment (hermes_constants.get_hermes_home).
     env = dict(os.environ, HERMES_HOME=str(SHARED_HERMES_HOME))
-    print(f"Launching `hermes setup` against the swarm config "
+    print(f"Launching `hermes setup` against the teams config "
           f"({SHARED_HERMES_HOME}) — providers, web/vision/browser tools, memory…\n")
     try:
         return subprocess.call([hermes, "setup", *getattr(args, "rest", [])], env=env)
@@ -361,7 +361,7 @@ def cmd_doctor(args) -> int:
     ok = True
 
     # 1) Hermes importable
-    from swarm_server.config import ensure_hermes_importable
+    from teams_server.config import ensure_hermes_importable
 
     ensure_hermes_importable()
     try:
@@ -378,7 +378,7 @@ def cmd_doctor(args) -> int:
         print("   → pip install hermes-agent   (or set HERMES_AGENT_PATH)")
 
     # 2) Provider configured (via Hermes) + backend reachable
-    from swarm_server.model_config import resolve_model, is_model_configured
+    from teams_server.model_config import resolve_model, is_model_configured
 
     if not is_model_configured():
         ok = False
@@ -390,7 +390,7 @@ def cmd_doctor(args) -> int:
         eff = resolve_model()
         prov = eff.get("display_provider") or eff.get("provider") or "?"
         srclabel = {
-            "default": "swarm default",
+            "default": "teams default",
             "hermes": "hermes setup (~/.hermes)",
         }.get(eff.get("source"), str(eff.get("source")))
         print(f"✓ Model: {eff.get('model')}  (provider {prov}, source: {srclabel})")
@@ -426,7 +426,7 @@ def cmd_doctor(args) -> int:
 
     # 3) Chromium for the browser tools (optional but recommended)
     try:
-        from swarm_server.browser_pool import _find_browser
+        from teams_server.browser_pool import _find_browser
 
         chromium = _find_browser()
         if chromium:
@@ -437,10 +437,10 @@ def cmd_doctor(args) -> int:
     except Exception as e:
         print(f"⚠ Could not probe Chromium: {e}")
 
-    # 4) Hermes compat seams — the internal APIs the swarm builds over. Drift here
+    # 4) Hermes compat seams — the internal APIs the teams builds over. Drift here
     # (after a Hermes update) silently disables features, so surface it explicitly.
     try:
-        from swarm_server.hermes_compat import run_self_check
+        from teams_server.hermes_compat import run_self_check
 
         report = run_self_check()
         if report.ok:
@@ -452,7 +452,7 @@ def cmd_doctor(args) -> int:
             if report.critical_failures:
                 ok = False
                 print("   → a Hermes update likely moved an internal API; see "
-                      "swarm_server/hermes_compat.py")
+                      "teams_server/hermes_compat.py")
     except Exception as e:
         print(f"⚠ Could not run Hermes compat self-check: {e}")
 
@@ -465,7 +465,7 @@ def cmd_init(args) -> int:
 
     No-op-safe: skips anything that already exists so it can be re-run.
     """
-    from swarm_server.config import (
+    from teams_server.config import (
         load_agents_config,
         create_team,
         create_agent,
@@ -511,18 +511,18 @@ def cmd_init(args) -> int:
 
 
 def cmd_set_model(args) -> int:
-    """Set the swarm's default provider/model non-interactively.
+    """Set the teams's default provider/model non-interactively.
 
     A scriptable alternative to the interactive ``hermes setup`` wizard — for
     AI-agent installs, CI, and headless servers where no TTY is available. Writes
-    to the swarm's shared config (``data/.hermes-shared``), which every agent
+    to the teams's shared config (``data/.hermes-shared``), which every agent
     reads as its default. Example:
 
       agent-teams set-model --provider custom --model deepseek-chat \\
         --base-url http://localhost:4000/v1 --api-key sk-...
     """
     import re
-    from swarm_server.model_config import set_default_model, get_default_model
+    from teams_server.model_config import set_default_model, get_default_model
 
     model = (args.model or "").strip()
     if not model:
@@ -545,7 +545,7 @@ def cmd_set_model(args) -> int:
     if base_url:
         shown += f" base_url={base_url}"
     print(f"✓ Default model set ({shown}).")
-    print("  Written to the swarm's shared config. Verify reachability with: agent-teams doctor")
+    print("  Written to the teams's shared config. Verify reachability with: agent-teams doctor")
     return 0
 
 
@@ -558,7 +558,7 @@ def _run_upgrade() -> int:
     """
     import subprocess
 
-    from swarm_server.config import PROJECT_ROOT
+    from teams_server.config import PROJECT_ROOT
 
     print(f"→ git pull --ff-only  ({PROJECT_ROOT})")
     rc = subprocess.run(
@@ -581,7 +581,7 @@ def _run_upgrade() -> int:
 
 def cmd_update(args) -> int:
     """Upgrade this install to the version on `main` (git pull + reinstall)."""
-    from swarm_server.update_check import check_for_update
+    from teams_server.update_check import check_for_update
 
     info = check_for_update(force=True)
     current, latest = info["current"], info.get("latest")
@@ -633,15 +633,15 @@ def main(argv=None) -> int:
     _setup_logging()
     p = argparse.ArgumentParser(
         prog="agent-teams",
-        description="P2P multi-agent swarm server + real-time dashboard, powered by Hermes.",
+        description="P2P multi-agent teams server + real-time dashboard, powered by Hermes.",
     )
     sub = p.add_subparsers(dest="cmd")
 
-    up = sub.add_parser("up", help="Run the swarm server + dashboard")
+    up = sub.add_parser("up", help="Run the teams server + dashboard")
     up.add_argument("-d", "--detach", action="store_true",
         help="daemonize and return immediately (survives the launching shell/agent)")
     up.add_argument("--log", default=None,
-        help="log file for --detach (default: <data>/swarm.log)")
+        help="log file for --detach (default: <data>/teams.log)")
     up.set_defaults(func=cmd_up)
 
     down = sub.add_parser("down", help="Stop a server started with `up` (incl. detached)")

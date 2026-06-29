@@ -8,7 +8,7 @@ accessibility-tree refs) and then dies on the editor (contenteditable —
 ``browser_type``'s clear+fill never fires real key events), with no screenshot
 to even see why.
 
-This module registers the missing rungs as swarm-side tools riding the SAME
+This module registers the missing rungs as teams-side tools riding the SAME
 session plumbing as the built-in browser tools (``_run_browser_command`` keys
 sessions by Hermes ``task_id``, which the daemon pins to ``agent_name:<name>``)
 — no Hermes fork, same tab, same cookies:
@@ -42,7 +42,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-log = logging.getLogger("swarm.guitools")
+log = logging.getLogger("teams.guitools")
 
 # Vision grounding call ceiling — a screenshot upload + VLM answer can be slow.
 VISION_LOCATE_TIMEOUT_SECONDS = 90
@@ -155,7 +155,7 @@ def _act(kwargs: dict, command: str, args: List[str],
 def _agent_workspace(caller: str) -> Optional[Path]:
     """The calling agent's workspace dir (parent of its HERMES_HOME)."""
     try:
-        from swarm_server.tools import _daemon_registry
+        from teams_server.tools import _daemon_registry
 
         daemon = _daemon_registry.get(caller)
         home = getattr(daemon, "_hermes_home", None) if daemon else None
@@ -193,8 +193,8 @@ def _resolve_keys_file(from_file: str, caller: str) -> "tuple[Optional[Path], st
     candidates = [p] if p.is_absolute() else []
     if not p.is_absolute():
         try:
-            from swarm_server.config import _get_project_dir
-            from swarm_server.tools import _daemon_registry
+            from teams_server.config import _get_project_dir
+            from teams_server.tools import _daemon_registry
 
             daemon = _daemon_registry.get(caller)
             team = (getattr(daemon, "cfg", None) or {}).get("team_id")
@@ -523,12 +523,12 @@ def _resolve_vision_endpoint(caller: str) -> Dict[str, str]:
     native providers have no base_url here and grounding is skipped (see callers).
     The model is the agent's MAIN model when it can read images (probed once,
     cached), else the configured vision model."""
-    from swarm_server.config import get_vision_model, resolve_screenshot_model
+    from teams_server.config import get_vision_model, resolve_screenshot_model
 
     base_url, api_key, main_model = "", "", ""
     try:
-        from swarm_server.model_config import resolve_model
-        from swarm_server.tools import _daemon_registry
+        from teams_server.model_config import resolve_model
+        from teams_server.tools import _daemon_registry
 
         daemon = _daemon_registry.get(caller)
         eff = resolve_model(getattr(daemon, "cfg", None) or {})

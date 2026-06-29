@@ -960,7 +960,7 @@ button.msg-header, button.cc-divider, button.exec-label { width: 100%; }
         <div class="modal-header" id="mh-login">API Key Required</div>
         <div class="modal-body">
             <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">
-                This server requires an API key (set via <code>SWARM_API_KEY</code>). Enter it to continue.
+                This server requires an API key (set via <code>TEAMS_API_KEY</code>). Enter it to continue.
             </div>
             <div class="control-group">
                 <label class="control-label" for="login-key">API Key</label>
@@ -1014,11 +1014,11 @@ const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.ho
 const API_URL = `${window.location.protocol}//${window.location.host}`;
 
 /* ===== AUTH (optional shared API key) =================================== *
- * The server guards every endpoint when SWARM_API_KEY is set. We attach the
+ * The server guards every endpoint when TEAMS_API_KEY is set. We attach the
  * stored key to same-origin requests via a single window.fetch wrapper (so all
  * ~42 call sites get it for free) and prompt for it on a 401. With no key set
  * (localhost default) apiKey stays '' and nothing changes. */
-const AUTH_STORAGE_KEY = 'swarm_api_key';
+const AUTH_STORAGE_KEY = 'teams_api_key';
 let apiKey = localStorage.getItem(AUTH_STORAGE_KEY) || '';
 let authRequired = false;
 let _loginShown = false;   // debounce: 3s/5s polls would 401-storm the modal
@@ -1186,7 +1186,7 @@ const _LEFT_DEFAULT_W = { 'ov-agents': 1.3, 'ov-workspace': 1, 'ov-queue': 1 };
 const _LEFT_MIN_PX = 78;
 let _leftW = {};
 
-function _saveLeftW() { try { localStorage.setItem('swarm_left_weights', JSON.stringify(_leftW)); } catch (e) {} }
+function _saveLeftW() { try { localStorage.setItem('teams_left_weights', JSON.stringify(_leftW)); } catch (e) {} }
 function _applyLeftW() {
     _LEFT_PANELS.forEach(id => {
         const el = document.getElementById(id);
@@ -1195,7 +1195,7 @@ function _applyLeftW() {
 }
 function initLeftResizers() {
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem('swarm_left_weights') || '{}'); } catch (e) {}
+    try { saved = JSON.parse(localStorage.getItem('teams_left_weights') || '{}'); } catch (e) {}
     _LEFT_PANELS.forEach(id => {
         const v = parseFloat(saved[id]);
         _leftW[id] = (isFinite(v) && v > 0) ? v : _LEFT_DEFAULT_W[id];
@@ -1550,7 +1550,7 @@ function renderNetwork() {
         svg.innerHTML = ''; svg.setAttribute('width', 1); svg.setAttribute('height', 1); document.getElementById('net-info').textContent = 'No agents'; _netSig = '';
         if (onboarding) {
             onboarding.innerHTML = `<div style="position:relative">
-                <h2>${icon('compass', 16)} Welcome to Hermes Swarm</h2>
+                <h2>${icon('compass', 16)} Welcome to Agent Teams</h2>
                 <p class="subtitle">This team currently has no agents. Follow the options below to get started:</p>
                 <div class="onboarding-option architect">
                     <h3>${icon('compass', 13)} Option 1: Chat with the Architect</h3>
@@ -1559,7 +1559,7 @@ function renderNetwork() {
                 </div>
                 <div class="onboarding-option">
                     <h3>${icon('settings', 13)} Option 2: Create Agents Manually</h3>
-                    <p>Build your swarm manually by defining agents individually. Click the "+ Add" button in the Agents panel to assign roles and souls.</p>
+                    <p>Build your teams manually by defining agents individually. Click the "+ Add" button in the Agents panel to assign roles and souls.</p>
                     <button class="btn btn-sm btn-secondary" onclick="showAddAgent()">${icon('plus', 12)} Create Manually</button>
                 </div>
             </div>`;
@@ -2087,7 +2087,7 @@ async function showAgentConfig(name) {
         const defLabel = cfg.effective_model ? `(Use team default — ${cfg.effective_model})` : '(Use team default)';
         modelSel.innerHTML = `<option value="">${esc(defLabel)}</option>`
             + opts.map(m => `<option value="${escAttr(m)}">${esc(m)}</option>`).join('');
-        modelSel.value = cfg.model || '';   // empty = inherit the swarm default
+        modelSel.value = cfg.model || '';   // empty = inherit the teams default
         document.getElementById('cfg-autonomous').checked = !!cfg.autonomous;
         document.getElementById('cfg-sweep').value = cfg.sweep_interval ?? '';
         document.getElementById('cfg-heartbeat').value = cfg.heartbeat_seconds ?? '';
@@ -2133,19 +2133,19 @@ function renderTelemetry(t) {
         <div style="margin-top:6px">Context used: <b style="color:${barColor}">${ctxPct}%</b><div class="cfg-ctx-bar"><div class="cfg-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${barColor}"></div></div></div>`;
 }
 
-let toolsetCatalog = null;   // {toolsets:[{name,description}], swarm_tools:[{name,description,required}]}
+let toolsetCatalog = null;   // {toolsets:[{name,description}], teams_tools:[{name,description,required}]}
 
 async function loadToolsets() {
     if (toolsetCatalog) { renderToolsetChips(); return; }
     try {
         const r = await fetch(`${API_URL}/toolsets`);
         const d = await r.json();
-        toolsetCatalog = { toolsets: d.toolsets || [], swarm_tools: d.swarm_tools || [] };
+        toolsetCatalog = { toolsets: d.toolsets || [], teams_tools: d.teams_tools || [] };
         const dl = document.getElementById('toolset-list');
         if (dl) {
             const sets = toolsetCatalog.toolsets.map(ts => `<option value="${escAttr(ts.name)}">${esc(ts.description || '')}</option>`);
-            const swarm = toolsetCatalog.swarm_tools.map(ts => `<option value="${escAttr(ts.name)}">swarm tool${ts.required ? ' (required)' : ''} — ${esc(ts.description || '')}</option>`);
-            dl.innerHTML = sets.concat(swarm).join('');
+            const teams = toolsetCatalog.teams_tools.map(ts => `<option value="${escAttr(ts.name)}">teams tool${ts.required ? ' (required)' : ''} — ${esc(ts.description || '')}</option>`);
+            dl.innerHTML = sets.concat(teams).join('');
         }
         renderToolsetChips();
     } catch (e) { /* non-fatal */ }
@@ -2160,8 +2160,8 @@ function renderToolsetChips() {
     if (!toolsetCatalog) return;
     const filter = (document.getElementById('ts-filter')?.value || '').trim().toLowerCase();
     const sets = toolsetCatalog.toolsets;
-    // Swarm tools are individually disable-able (except required ones) but never go in enabled_toolsets.
-    const disablables = sets.concat(toolsetCatalog.swarm_tools.filter(t => !t.required));
+    // Teams tools are individually disable-able (except required ones) but never go in enabled_toolsets.
+    const disablables = sets.concat(toolsetCatalog.teams_tools.filter(t => !t.required));
     const renderGroup = (elId, items, inputId) => {
         const el = document.getElementById(elId);
         if (!el) return;
@@ -2392,7 +2392,7 @@ async function showModelSettings(firstRun) {
             <button class="btn btn-sm" style="margin-left:8px" onclick="adoptDetected()">Use this</button></div>`;
     } else {
         det.innerHTML = firstRun
-            ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">No model configured yet — connect one to start the swarm.</div>'
+            ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">No model configured yet — connect one to start the teams.</div>'
             : '';
     }
 
@@ -2825,7 +2825,7 @@ async function loadTeams() {
         if (!currentTeam && teamsCache.length) {
             // Land on the last team the operator was viewing (survives a refresh),
             // falling back to the first team if that one no longer exists.
-            const last = localStorage.getItem('swarm_last_team');
+            const last = localStorage.getItem('teams_last_team');
             currentTeam = (last && teamsCache.some(t => t.id === last)) ? last : teamsCache[0].id;
             sel.value = currentTeam;
         }
@@ -2837,7 +2837,7 @@ async function loadTeams() {
 
 function changeTeam(teamId) {
     currentTeam = teamId;
-    try { localStorage.setItem('swarm_last_team', teamId || ''); } catch (e) {}
+    try { localStorage.setItem('teams_last_team', teamId || ''); } catch (e) {}
     selectedAgent = null;
     agentData = {};
     teamBudget = {};               // clear the previous team's banner immediately
@@ -3249,7 +3249,7 @@ async function checkForUpdate() {
         if (!info || !info.update_available || !info.latest) return;
         // Respect a prior dismissal of THIS version (re-popups on a newer one).
         if (localStorage.getItem('dismissed_update') === info.latest) return;
-        const hint = info.upgrade_hint || 'hermes-swarm update';
+        const hint = info.upgrade_hint || 'agent-teams update';
         showToast({
             title: `Update available → v${info.latest}`,
             body: `You're on v${info.current}. Upgrade with <code>${esc(hint)}</code>`,
@@ -3263,7 +3263,7 @@ function dismissUpdate(info) {
     inboxNotices.push({
         id: `update-${info.latest}`,
         title: `Update available → v${info.latest}`,
-        body: `You're on v${info.current}. Upgrade with: ${info.upgrade_hint || 'hermes-swarm update'}`,
+        body: `You're on v${info.current}. Upgrade with: ${info.upgrade_hint || 'agent-teams update'}`,
         timestamp: Date.now() / 1000,
     });
     bumpInboxBadge(1);
@@ -3282,7 +3282,7 @@ function toggleInbox() {
 let masterBusy = false;
 let masterHistoryLoaded = false;
 
-const MASTER_WELCOME = `**I'm the Architect** — your team builder for this swarm.
+const MASTER_WELCOME = `**I'm the Architect** — your team builder for this teams.
 
 I understand the whole framework, so you don't have to wire agents by hand. Tell me **what you want to accomplish** and I'll:
 

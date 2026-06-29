@@ -7,10 +7,10 @@ import time
 import uuid
 from typing import Any, Dict, List
 
-from swarm_server.monitoring import monitor_db
-from swarm_server.websocket import _broadcast
+from teams_server.monitoring import monitor_db
+from teams_server.websocket import _broadcast
 
-log = logging.getLogger("swarm.tools")
+log = logging.getLogger("teams.tools")
 
 # How long ask_human blocks the worker thread waiting for an in-turn answer.
 # On elapse the question stays PENDING (not failed) and the answer is re-delivered
@@ -18,7 +18,7 @@ log = logging.getLogger("swarm.tools")
 # Default 6h: the human usually answers in-turn (smooth resume) rather than the
 # agent ending its turn and resuming later via the re-delivered task.
 import os as _os
-_ASK_HUMAN_WAIT_SECONDS = int(_os.environ.get("SWARM_ASK_HUMAN_WAIT_SECONDS", "21600"))
+_ASK_HUMAN_WAIT_SECONDS = int(_os.environ.get("TEAMS_ASK_HUMAN_WAIT_SECONDS", "21600"))
 
 # Maps agent_name -> AgentDaemon instance (populated at runtime by server.py)
 _daemon_registry: Dict[str, Any] = {}
@@ -40,14 +40,14 @@ def add_pending_question(
     task). ``kind`` distinguishes a browser takeover from an ordinary question so
     only real takeovers trigger end_takeover on answer.
     """
-    from swarm_server.config import MAX_PENDING_QUESTIONS
+    from teams_server.config import MAX_PENDING_QUESTIONS
 
     # Resolve the asking agent's team so the inbox can show WHICH team a request
     # belongs to — agent names can collide across teams, so the team is what
     # disambiguates them. Best-effort: a missing config/agent leaves it blank.
     team_id = ""
     try:
-        from swarm_server.config import load_agents_config
+        from teams_server.config import load_agents_config
 
         team_id = load_agents_config()["agents"].get(agent_name, {}).get("team_id", "") or ""
     except Exception:
@@ -215,7 +215,7 @@ _SEND_PEER_MESSAGE_TOOL_SCHEMA = {
         "name": "send_peer_message",
         "description": (
             "Send a message to a linked peer. The `kind` controls whether it WAKES the "
-            "recipient — choose it deliberately, it is how the swarm avoids endless "
+            "recipient — choose it deliberately, it is how the teams avoids endless "
             "status ping-pong:\n"
             "• TASK — delegate concrete work. WAKES them; they owe you a RESULT. Returns a "
             "task_id.\n"
@@ -436,7 +436,7 @@ _READ_FILES_CHARS_EACH = 24_000
 def _read_files_handler(args: dict, **kwargs) -> str:
     from pathlib import Path
 
-    from swarm_server.config import _derive_workspace_path, load_agents_config
+    from teams_server.config import _derive_workspace_path, load_agents_config
 
     caller = _caller_from_kwargs(kwargs)
     paths = args.get("paths") or []
@@ -565,7 +565,7 @@ _SCHEDULE_WAKEUP_TOOL_SCHEMA = {
         "name": "schedule_wakeup",
         "description": (
             "Schedule a future wake-up for YOURSELF — recurring OR one-time. At each "
-            "scheduled time the swarm injects your 'instruction' to you as a new task "
+            "scheduled time the teams injects your 'instruction' to you as a new task "
             "and you act on it. Use it for anything periodic (a 9am competitor check, "
             "an hourly metrics pull, a Monday digest) so it happens on time without a "
             "human. IMPORTANT: for a task that should run only ONCE at a future time, "
@@ -693,13 +693,13 @@ _RESUME_AGENT_TOOL_SCHEMA = {
 }
 
 
-# Swarm-native tools (registered on every agent AFTER Hermes init, so they
+# Teams-native tools (registered on every agent AFTER Hermes init, so they
 # survive any toolset whitelist). `send_peer_message` is REQUIRED (agents end
 # their turn with it) and cannot be disabled; the rest are optional and can be
 # turned off per agent via `disabled_toolsets`. pause_agent/resume_agent are
 # registered ONLY on supervisor agents (see agent.py).
-REQUIRED_SWARM_TOOLS = ("send_peer_message",)
-_SWARM_TOOL_SCHEMAS = (
+REQUIRED_TEAMS_TOOLS = ("send_peer_message",)
+_TEAMS_TOOL_SCHEMAS = (
     _SEND_PEER_MESSAGE_TOOL_SCHEMA,
     _ASK_HUMAN_TOOL_SCHEMA,
     _LOG_DECISION_TOOL_SCHEMA,
@@ -715,11 +715,11 @@ _SWARM_TOOL_SCHEMAS = (
 )
 
 
-def list_swarm_tools():
-    """The swarm's own tools (not Hermes toolsets) as [{name, description, required}]
+def list_teams_tools():
+    """The teams's own tools (not Hermes toolsets) as [{name, description, required}]
     for the dashboard's enabled/disabled-toolsets picker."""
     out = []
-    for s in _SWARM_TOOL_SCHEMAS:
+    for s in _TEAMS_TOOL_SCHEMAS:
         fn = (s or {}).get("function", {}) if isinstance(s, dict) else {}
         name = fn.get("name")
         if not name:
@@ -727,7 +727,7 @@ def list_swarm_tools():
         out.append({
             "name": name,
             "description": str(fn.get("description") or "")[:160],
-            "required": name in REQUIRED_SWARM_TOOLS,
+            "required": name in REQUIRED_TEAMS_TOOLS,
         })
     return out
 
@@ -743,7 +743,7 @@ def _send_peer_message_handler(args: dict, **kwargs) -> str:
     if task_id_arg and task_id_arg.startswith("agent_name:"):
         caller = task_id_arg.split(":", 1)[1]
 
-    from swarm_server.config import load_agents_config, peer_allowed
+    from teams_server.config import load_agents_config, peer_allowed
 
     cfg = load_agents_config()
 
@@ -894,7 +894,7 @@ def _block_on_human(daemon, caller: str, prompt: str, *, kind: str = "question")
     On timeout/pause/stop the question is LEFT pending, so a later answer is
     re-delivered as a task by the REST endpoint.
     """
-    from swarm_server.agent import AGENT_STATE_ASKING_HUMAN, AGENT_STATE_BUSY
+    from teams_server.agent import AGENT_STATE_ASKING_HUMAN, AGENT_STATE_BUSY
 
     # Arm the wake channel before the question becomes answerable.
     daemon.human_event.clear()
@@ -932,7 +932,7 @@ def _block_on_human(daemon, caller: str, prompt: str, *, kind: str = "question")
                 response = q["response"]
         # On timeout we deliberately LEAVE the question 'pending' (do NOT mark it
         # timed_out): it stays open in the human's inbox, and a later answer is
-        # re-delivered as a new task — this is what makes a 24/7 swarm survive a
+        # re-delivered as a new task — this is what makes a 24/7 teams survive a
         # human who is away for hours.
     if answered:
         daemon.human_response = response
@@ -1002,8 +1002,8 @@ def _request_human_takeover_handler(args: dict, **kwargs) -> str:
         return json.dumps({"error": f"Caller agent '{caller}' not registered."})
     team_id = (daemon.cfg or {}).get("team_id", "default")
 
-    from swarm_server.config import SWARM_TAKEOVER_MODE
-    embedded = SWARM_TAKEOVER_MODE != "window"
+    from teams_server.config import TEAMS_TAKEOVER_MODE
+    embedded = TEAMS_TAKEOVER_MODE != "window"
 
     shown = False
     if embedded:
@@ -1011,7 +1011,7 @@ def _request_human_takeover_handler(args: dict, **kwargs) -> str:
         # view embedded in the dashboard. Just make sure a browser exists so the
         # stream has something to attach to.
         try:
-            from swarm_server.browser_pool import team_browser_manager
+            from teams_server.browser_pool import team_browser_manager
             shown = bool(team_browser_manager.ensure_team_browser(team_id))
         except Exception as e:
             log.error("[%s] [takeover] ensure_team_browser failed: %s", caller, e)
@@ -1027,7 +1027,7 @@ def _request_human_takeover_handler(args: dict, **kwargs) -> str:
         # Legacy: bring the team browser onto the host's screen as a real,
         # visible Chrome window, opened on the page the agent was blocked on.
         try:
-            from swarm_server.browser_pool import team_browser_manager
+            from teams_server.browser_pool import team_browser_manager
             shown = team_browser_manager.begin_takeover(team_id)
         except Exception as e:
             log.error("[%s] [takeover] begin_takeover failed: %s", caller, e)
@@ -1062,7 +1062,7 @@ def _request_human_takeover_handler(args: dict, **kwargs) -> str:
 
     # Human finished in-turn — send the browser back to the hidden display, resume.
     try:
-        from swarm_server.browser_pool import team_browser_manager
+        from teams_server.browser_pool import team_browser_manager
         team_browser_manager.end_takeover(team_id)
     except Exception as e:
         log.error("[%s] [takeover] end_takeover failed: %s", caller, e)
@@ -1095,7 +1095,7 @@ def _log_decision_handler(args: dict, **kwargs) -> str:
     if not one_line:
         return json.dumps({"success": False, "error": "Empty decision."})
 
-    from swarm_server.config import load_agents_config
+    from teams_server.config import load_agents_config
 
     cfg = load_agents_config()
     team_id = cfg["agents"].get(caller, {}).get("team_id", "default")
@@ -1125,7 +1125,7 @@ def _recall_decisions_handler(args: dict, **kwargs) -> str:
     except (TypeError, ValueError):
         limit = 40
 
-    from swarm_server.config import load_agents_config
+    from teams_server.config import load_agents_config
 
     cfg = load_agents_config()
     team_id = cfg["agents"].get(caller, {}).get("team_id", "default")
@@ -1170,7 +1170,7 @@ def _close_ledger_entry_handler(args: dict, **kwargs) -> str:
         return json.dumps({"success": False,
                            "error": "A one-line verification reason is required."})
 
-    from swarm_server.config import load_agents_config
+    from teams_server.config import load_agents_config
 
     cfg = load_agents_config()
     agent_cfg = cfg["agents"].get(caller, {})
@@ -1201,7 +1201,7 @@ def _log_action_handler(args: dict, **kwargs) -> str:
     if not action_type or not key:
         return json.dumps({"success": False, "error": "action_type and idempotency_key are required."})
 
-    from swarm_server.config import load_agents_config
+    from teams_server.config import load_agents_config
     cfg = load_agents_config()
     team_id = cfg["agents"].get(caller, {}).get("team_id", "default")
 
@@ -1240,8 +1240,8 @@ def _caller_from_kwargs(kwargs: dict) -> str:
 
 def _get_self_config_handler(args: dict, **kwargs) -> str:
     caller = _caller_from_kwargs(kwargs)
-    from swarm_server.config import load_agents_config
-    from swarm_server.model_config import resolve_model
+    from teams_server.config import load_agents_config
+    from teams_server.model_config import resolve_model
 
     cfg = load_agents_config()
     a = cfg["agents"].get(caller)
@@ -1249,7 +1249,7 @@ def _get_self_config_handler(args: dict, **kwargs) -> str:
         return json.dumps({"success": False, "error": f"Agent '{caller}' not found."})
     editable = {k: a.get(k) for k in SELF_CONFIG_ALLOWED_KEYS}
     # Show the effective model: explicit per-agent override, else the resolved
-    # default (swarm default / ~/.hermes), else empty (unconfigured).
+    # default (teams default / ~/.hermes), else empty (unconfigured).
     editable["model"] = editable.get("model") or resolve_model(a).get("model") or ""
     daemon = _daemon_registry.get(caller)
     telemetry = dict(getattr(daemon, "_telemetry", {}) or {}) if daemon else {}
@@ -1308,7 +1308,7 @@ def reload_daemon_crons(agent_name: str) -> None:
     Shared by the schedule_wakeup / cancel_wakeup tools and the REST endpoints so
     a cron change takes effect immediately without re-initialising the AIAgent.
     """
-    from swarm_server.config import load_agents_config
+    from teams_server.config import load_agents_config
 
     daemon = _daemon_registry.get(agent_name)
     if daemon is None:
@@ -1325,8 +1325,8 @@ def _schedule_wakeup_handler(args: dict, **kwargs) -> str:
     caller = _caller_from_kwargs(kwargs)
     schedule = (args.get("schedule") or "").strip()
     instruction = (args.get("instruction") or "").strip()
-    from swarm_server.config import load_agents_config, add_agent_cron
-    from swarm_server.cron import cron_next, cron_describe
+    from teams_server.config import load_agents_config, add_agent_cron
+    from teams_server.cron import cron_next, cron_describe
 
     cfg = load_agents_config()
     if caller not in cfg["agents"]:
@@ -1392,7 +1392,7 @@ def _schedule_wakeup_handler(args: dict, **kwargs) -> str:
 def _cancel_wakeup_handler(args: dict, **kwargs) -> str:
     caller = _caller_from_kwargs(kwargs)
     cron_id = (args.get("cron_id") or "").strip()
-    from swarm_server.config import load_agents_config, remove_agent_cron
+    from teams_server.config import load_agents_config, remove_agent_cron
 
     cfg = load_agents_config()
     if caller not in cfg["agents"]:
@@ -1422,7 +1422,7 @@ def _pause_agent_handler(args: dict, **kwargs) -> str:
     if task_id_arg and task_id_arg.startswith("agent_name:"):
         caller = task_id_arg.split(":", 1)[1]
 
-    from swarm_server.config import load_agents_config
+    from teams_server.config import load_agents_config
     cfg = load_agents_config()
 
     # Gate 1: only a supervisor may wield the brake.
@@ -1485,7 +1485,7 @@ def _resume_agent_handler(args: dict, **kwargs) -> str:
     if task_id_arg and task_id_arg.startswith("agent_name:"):
         caller = task_id_arg.split(":", 1)[1]
 
-    from swarm_server.config import load_agents_config
+    from teams_server.config import load_agents_config
     cfg = load_agents_config()
     if not cfg["agents"].get(caller, {}).get("is_supervisor"):
         return json.dumps({"success": False, "error": "Only a supervisor agent can resume another agent."})
@@ -1511,7 +1511,7 @@ def _resume_agent_handler(args: dict, **kwargs) -> str:
 
 def _register_custom_tools():
     try:
-        from swarm_server.config import ensure_hermes_importable
+        from teams_server.config import ensure_hermes_importable
 
         ensure_hermes_importable()
         from tools.registry import registry
@@ -1522,7 +1522,7 @@ def _register_custom_tools():
                 toolset="custom",
                 schema=_SEND_PEER_MESSAGE_TOOL_SCHEMA["function"],
                 handler=_send_peer_message_handler,
-                description="Send a message to another swarm agent.",
+                description="Send a message to another teams agent.",
             )
             log.info("[send_peer_message] Registered")
         if "ask_human" not in (registry.get_tool_to_toolset_map() or {}):
@@ -1647,7 +1647,7 @@ def _register_custom_tools():
         # stream, each under a site key with an explicit purpose, so agents
         # stop reusing e.g. an SMTP app password as a website login.
         try:
-            from swarm_server.credentials import (
+            from teams_server.credentials import (
                 GET_CREDENTIAL_TOOL_SCHEMA, LIST_CREDENTIALS_TOOL_SCHEMA,
                 get_credential_handler, list_credentials_handler,
             )
@@ -1678,7 +1678,7 @@ def _register_custom_tools():
         # commands Hermes doesn't expose. Schemas are appended per-agent in
         # agent.py (never for supervisors, only when browser is active).
         try:
-            from swarm_server.browser_gui_tools import register_gui_browser_tools
+            from teams_server.browser_gui_tools import register_gui_browser_tools
 
             register_gui_browser_tools(registry)
         except Exception as exc:  # noqa: BLE001
@@ -1688,7 +1688,7 @@ def _register_custom_tools():
         # handlers (ddgs / httpx fallback) so every agent uses crawl4ai as the
         # primary web search + fetch engine. Reuses the existing schemas.
         try:
-            from swarm_server.web_crawl4ai import install_crawl4ai_web_tools
+            from teams_server.web_crawl4ai import install_crawl4ai_web_tools
 
             install_crawl4ai_web_tools(registry)
         except Exception as exc:  # noqa: BLE001

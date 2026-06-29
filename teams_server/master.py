@@ -1,9 +1,9 @@
-"""Master "Architect" agent — a teamless helper that designs and builds swarm teams.
+"""Master "Architect" agent — a teamless helper that designs and builds teams teams.
 
 The Architect is NOT a member of any team and NOT a daemon: it has no sweeps,
 heartbeats, crons, or monitoring. It is a single Hermes ``AIAgent`` the human
-chats with from the dashboard. Its only powers are the ``swarm_master`` tools —
-inspect the swarm, create teams/agents, write souls, wire links, seed workspace
+chats with from the dashboard. Its only powers are the ``teams_master`` tools —
+inspect the teams, create teams/agents, write souls, wire links, seed workspace
 files, kick off the team, and (with explicit confirmation) tear things down.
 
 It runs on its own isolated ``HERMES_HOME`` (``DATA_ROOT/master/.hermes``) so its
@@ -12,7 +12,7 @@ through its chat replies (no ``send_peer_message`` / ``ask_human``).
 
 Design notes:
   * The master tools are registered in the shared Hermes registry under the
-    toolset ``swarm_master``. Team agents are explicitly denied this toolset (see
+    toolset ``teams_master``. Team agents are explicitly denied this toolset (see
     ``AgentDaemon._ensure_agent``), and every handler ALSO verifies the caller is
     "master" — defense in depth against the schema leaking into a team agent.
   * Daemon spawn/despawn/update must run on the server's event loop, but the
@@ -31,7 +31,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-log = logging.getLogger("swarm.master")
+log = logging.getLogger("teams.master")
 
 MASTER_NAME = "master"
 MASTER_TASK_ID = f"agent_name:{MASTER_NAME}"
@@ -80,18 +80,18 @@ _toolsets_cache: Optional[str] = None
 def _available_toolsets_str() -> str:
     """Comma-joined names of the Hermes toolsets an agent can be given, so the
     Architect can set enabled/disabled_toolsets knowledgeably. Cached (the set is
-    static for a deployment); swarm_master is hidden (Architect-only)."""
+    static for a deployment); teams_master is hidden (Architect-only)."""
     global _toolsets_cache
     if _toolsets_cache is not None:
         return _toolsets_cache
     try:
-        from swarm_server.config import ensure_hermes_importable
+        from teams_server.config import ensure_hermes_importable
 
         ensure_hermes_importable()
         from tools.registry import registry
 
         names = sorted(n for n in (registry.get_registered_toolset_names() or [])
-                       if n and n != "swarm_master")
+                       if n and n != "teams_master")
         _toolsets_cache = ", ".join(names) if names else "(unavailable)"
     except Exception:  # noqa: BLE001
         _toolsets_cache = "(unavailable)"
@@ -100,7 +100,7 @@ def _available_toolsets_str() -> str:
 
 def _broadcast(event_type: str, payload: dict) -> None:
     try:
-        from swarm_server.websocket import _broadcast as ws_broadcast
+        from teams_server.websocket import _broadcast as ws_broadcast
 
         ws_broadcast(event_type, payload)
     except Exception as e:  # noqa: BLE001
@@ -111,15 +111,15 @@ def _broadcast(event_type: str, payload: dict) -> None:
 # Framework manual + behavior contract (the Architect's identity / SOUL.md)
 # ---------------------------------------------------------------------------
 MASTER_SOUL = """\
-You are the ARCHITECT — the master builder of this multi-agent swarm framework.
+You are the ARCHITECT — the master builder of this multi-agent teams framework.
 You are NOT part of any team. You are a helper assistant to the human operator:
 you understand the framework completely and you BUILD agent teams for them, so
 they never have to hand-craft agents, souls, links, or briefs in the raw UI.
 
 # Your environment (where you live)
 
-You run INSIDE a live swarm server — a long-running process that hosts every
-team. The human talks to you through a chat panel in the swarm DASHBOARD (a web
+You run INSIDE a live teams server — a long-running process that hosts every
+team. The human talks to you through a chat panel in the teams DASHBOARD (a web
 UI that also shows every team as a live canvas of agents, their messages, queues,
 and costs). You are a singleton: one Architect for the whole server, with your
 own private conversation that no team agent can see.
@@ -130,9 +130,9 @@ becomes that team's brief on the agents' very next turn; when you send a task it
 lands in a real queue. There is no "draft" or "deploy" step — building IS doing.
 So design carefully and propose before you build.
 
-The current swarm state (which teams and agents exist, the model agents run on,
+The current teams state (which teams and agents exist, the model agents run on,
 and the toolsets available to agents) is given to you at the top of each message
-in a [SWARM STATE] line — read it. Use master_overview / master_get_team for
+in a [TEAMS STATE] line — read it. Use master_overview / master_get_team for
 detail. You also have web_search and web_extract to research a domain, product,
 competitor, or best practices before proposing a team — use them when the goal
 involves a space you should understand first.
@@ -168,14 +168,14 @@ autonomous Hermes LLM with:
     idle (heartbeat). Recommend EXACTLY ONE autonomous driver per team (the
     lead) so the team has a single engine; workers are reactive (autonomous off)
     and act when delegated to. Too many autonomous agents = runaway token spend.
-  - model / sampling: leave unset to inherit the swarm default model — only
+  - model / sampling: leave unset to inherit the teams default model — only
     override when a role genuinely needs a different model.
   - crons (scheduled wake-ups): for periodic routines (a 9am check-in). Keep the
     instruction GOAL-LEVEL and short (≤600 chars); put detailed steps in a
     workspace runbook file the cron references — never inline a long frozen
     script (it rots).
 
-Agents automatically get the swarm coordination tools (send_peer_message,
+Agents automatically get the teams coordination tools (send_peer_message,
 ask_human, log_decision, …) plus file/terminal/browser toolsets. You don't wire
 those; you design roles, souls, links, and the brief.
 
@@ -226,7 +226,7 @@ autonomous driver, and don't create more agents than the goal needs. A focused
   workspace.md (never paste secrets into souls or committed files).
 - DELETIONS are destructive. Propose the deletion, get an explicit "yes", and
   only then call the delete tool with confirm=true.
-- You only have the swarm_master tools. You cannot browse, run code, or message
+- You only have the teams_master tools. You cannot browse, run code, or message
   team agents — you act through your tools and you talk to the human through your
   replies. Be concrete and concise; the human reads your messages in a chat panel.
 """
@@ -280,14 +280,14 @@ _MASTER_TOOL_SCHEMAS: List[dict] = [
         "Create one agent in a team. Create the agents a supervisor watches BEFORE the "
         "supervisor, then link them. Its daemon starts immediately.",
         {"team_id": {"type": "string"},
-         "agent_name": {"type": "string", "description": "slug, unique across the whole swarm"},
+         "agent_name": {"type": "string", "description": "slug, unique across the whole teams"},
          "display_name": {"type": "string"},
          "role_soul": {"type": "string", "description": "the agent's identity/system prompt (~100–200 words)"},
          "allowed_peers": {"type": "array", "items": {"type": "string"},
                            "description": "agent_names in the SAME team to link bidirectionally (optional)"},
          "is_supervisor": {"type": "boolean", "description": "default false"},
          "autonomous": {"type": "boolean", "description": "self-drives when idle; recommend exactly one per team"},
-         "model": {"type": "string", "description": "optional model override; omit to inherit the swarm default"}},
+         "model": {"type": "string", "description": "optional model override; omit to inherit the teams default"}},
         ["team_id", "agent_name", "display_name", "role_soul"]),
     _fn("master_update_agent",
         "Patch an existing agent's editable fields (role_soul, autonomous, is_supervisor, "
@@ -392,7 +392,7 @@ def _supervisor_warnings(cfg: dict, team_id: str) -> List[str]:
 
 
 def _read_workspace_md(team_id: str) -> str:
-    from swarm_server.config import _get_team_workspace_path
+    from teams_server.config import _get_team_workspace_path
 
     p = _get_team_workspace_path(team_id) / "workspace.md"
     try:
@@ -404,7 +404,7 @@ def _read_workspace_md(team_id: str) -> str:
 def _master_overview_handler(args: dict, **kwargs) -> str:
     if (g := _guard(kwargs)):
         return g
-    from swarm_server.config import load_agents_config
+    from teams_server.config import load_agents_config
 
     cfg = load_agents_config()
     teams = []
@@ -445,7 +445,7 @@ def _file_tree(base: Path, max_entries: int = _LIST_FILES_MAX) -> List[str]:
 def _master_get_team_handler(args: dict, **kwargs) -> str:
     if (g := _guard(kwargs)):
         return g
-    from swarm_server.config import (
+    from teams_server.config import (
         load_agents_config, _get_team_workspace_path, _get_project_dir,
     )
 
@@ -479,7 +479,7 @@ def _master_get_team_handler(args: dict, **kwargs) -> str:
 def _master_create_team_handler(args: dict, **kwargs) -> str:
     if (g := _guard(kwargs)):
         return g
-    from swarm_server.config import load_agents_config, create_team
+    from teams_server.config import load_agents_config, create_team
 
     team_id = (args.get("team_id") or "").strip()
     name = (args.get("name") or "").strip()
@@ -498,7 +498,7 @@ def _master_create_team_handler(args: dict, **kwargs) -> str:
 def _master_create_agent_handler(args: dict, **kwargs) -> str:
     if (g := _guard(kwargs)):
         return g
-    from swarm_server.config import (
+    from teams_server.config import (
         load_agents_config, create_agent, save_agent_config, set_agent_peers,
     )
 
@@ -557,9 +557,9 @@ def _master_create_agent_handler(args: dict, **kwargs) -> str:
 def _master_update_agent_handler(args: dict, **kwargs) -> str:
     if (g := _guard(kwargs)):
         return g
-    from swarm_server.config import load_agents_config, save_agent_config
+    from teams_server.config import load_agents_config, save_agent_config
     # Reuse the SAME whitelist + normalization the REST PATCH endpoint uses.
-    from swarm_server.server import _apply_config_fields
+    from teams_server.server import _apply_config_fields
 
     agent_name = (args.get("agent_name") or "").strip()
     fields = args.get("fields") or {}
@@ -580,7 +580,7 @@ def _master_update_agent_handler(args: dict, **kwargs) -> str:
 def _master_set_links_handler(args: dict, **kwargs) -> str:
     if (g := _guard(kwargs)):
         return g
-    from swarm_server.config import load_agents_config, set_agent_peers
+    from teams_server.config import load_agents_config, set_agent_peers
 
     agent_name = (args.get("agent_name") or "").strip()
     peers = args.get("peers")
@@ -600,7 +600,7 @@ def _master_set_links_handler(args: dict, **kwargs) -> str:
 
 def _resolve_team_file(team_id: str, area: str, rel_path: str):
     """Return (base, resolved_path) or raise ValueError on an unsafe/unknown path."""
-    from swarm_server.config import (
+    from teams_server.config import (
         load_agents_config, _get_team_workspace_path, _ensure_project_dir,
     )
 
@@ -687,7 +687,7 @@ def _master_list_files_handler(args: dict, **kwargs) -> str:
 def _master_send_task_handler(args: dict, **kwargs) -> str:
     if (g := _guard(kwargs)):
         return g
-    from swarm_server.tools import _daemon_registry
+    from teams_server.tools import _daemon_registry
 
     agent_name = (args.get("agent_name") or "").strip()
     message = (args.get("message") or "").strip()
@@ -705,7 +705,7 @@ def _master_send_task_handler(args: dict, **kwargs) -> str:
     # (the task still goes through — this is a visible reminder, not a block).
     warnings: List[str] = []
     try:
-        from swarm_server.config import load_agents_config
+        from teams_server.config import load_agents_config
 
         cfg = load_agents_config()
         team_id = (cfg.get("agents", {}).get(agent_name, {}) or {}).get("team_id")
@@ -721,7 +721,7 @@ def _master_delete_agent_handler(args: dict, **kwargs) -> str:
         return g
     if not bool(args.get("confirm")):
         return _err("Refused: set confirm=true ONLY after the human explicitly approved the deletion.")
-    from swarm_server.config import load_agents_config
+    from teams_server.config import load_agents_config
 
     agent_name = (args.get("agent_name") or "").strip()
     cfg = load_agents_config()
@@ -740,7 +740,7 @@ def _master_delete_team_handler(args: dict, **kwargs) -> str:
         return g
     if not bool(args.get("confirm")):
         return _err("Refused: set confirm=true ONLY after the human explicitly approved the deletion.")
-    from swarm_server.config import load_agents_config
+    from teams_server.config import load_agents_config
 
     team_id = (args.get("team_id") or "").strip()
     cfg = load_agents_config()
@@ -775,8 +775,8 @@ _MASTER_HANDLERS = {
 
 
 def register_master_tools() -> None:
-    """Register the swarm_master toolset in the shared Hermes registry (idempotent)."""
-    from swarm_server.config import ensure_hermes_importable
+    """Register the teams_master toolset in the shared Hermes registry (idempotent)."""
+    from teams_server.config import ensure_hermes_importable
 
     ensure_hermes_importable()
     from tools.registry import registry
@@ -789,12 +789,12 @@ def register_master_tools() -> None:
             continue
         registry.register(
             name=name,
-            toolset="swarm_master",
+            toolset="teams_master",
             schema=fn,
             handler=_MASTER_HANDLERS[name],
             description=fn["description"][:120],
         )
-    log.info("[master] swarm_master toolset registered (%d tools)", len(_MASTER_TOOL_SCHEMAS))
+    log.info("[master] teams_master toolset registered (%d tools)", len(_MASTER_TOOL_SCHEMAS))
 
 
 # ---------------------------------------------------------------------------
@@ -802,7 +802,7 @@ def register_master_tools() -> None:
 # ---------------------------------------------------------------------------
 class MasterAgent:
     def __init__(self) -> None:
-        from swarm_server.config import DATA_ROOT
+        from teams_server.config import DATA_ROOT
 
         self._home = Path(DATA_ROOT) / "master"
         self._hermes_home = self._home / ".hermes"
@@ -863,8 +863,8 @@ class MasterAgent:
 
     # -- model status ------------------------------------------------------
     def model(self) -> str:
-        from swarm_server.model_config import resolve_model
-        from swarm_server.config import get_global_settings
+        from teams_server.model_config import resolve_model
+        from teams_server.config import get_global_settings
 
         override = (get_global_settings().get("master_model") or "").strip()
         eff = resolve_model({"model": override} if override else {})
@@ -874,7 +874,7 @@ class MasterAgent:
         return self._busy
 
     def is_configured(self) -> bool:
-        from swarm_server.model_config import is_model_configured
+        from teams_server.model_config import is_model_configured
 
         try:
             return bool(is_model_configured())
@@ -885,11 +885,11 @@ class MasterAgent:
     def _ensure_agent(self):
         if self._ai_agent is not None:
             return
-        from swarm_server.agent import (
+        from teams_server.agent import (
             _ensure_hermes_on_path, _agent_init_lock,
         )
-        from swarm_server.config import write_agent_hermes_config, get_global_settings
-        from swarm_server.model_config import resolve_model
+        from teams_server.config import write_agent_hermes_config, get_global_settings
+        from teams_server.model_config import resolve_model
 
         with _agent_init_lock:
             if self._ai_agent is not None:
@@ -920,11 +920,11 @@ class MasterAgent:
 
             self._write_soul_md(f"You are the Architect.\n\n{MASTER_SOUL}")
 
-            # The Architect gets its own swarm_master tools plus web search/extract
+            # The Architect gets its own teams_master tools plus web search/extract
             # (web_search, web_extract) so it can research a domain while designing
             # a team. It deliberately gets NOTHING else — no terminal, browser, or
             # file tools beyond its scoped master_* file tools.
-            extra_kwargs: Dict[str, Any] = {"enabled_toolsets": ["swarm_master", "web"]}
+            extra_kwargs: Dict[str, Any] = {"enabled_toolsets": ["teams_master", "web"]}
             if eff.get("provider"):
                 extra_kwargs["provider"] = eff["provider"]
             # Progress callbacks via the constructor (public API), not attr writes.
@@ -959,7 +959,7 @@ class MasterAgent:
             # registry is populated for that check.
             try:
                 from tools.registry import registry as _hermes_registry
-                from swarm_server.web_crawl4ai import install_crawl4ai_web_tools
+                from teams_server.web_crawl4ai import install_crawl4ai_web_tools
 
                 install_crawl4ai_web_tools(_hermes_registry)
             except Exception as _e:  # noqa: BLE001
@@ -1014,8 +1014,8 @@ class MasterAgent:
         if session_db is None:
             return []
         try:
-            from swarm_server.prompts import age_stale_tool_results
-            from swarm_server.config import (
+            from teams_server.prompts import age_stale_tool_results
+            from teams_server.config import (
                 TOOL_RESULT_AGE_ENABLED, TOOL_RESULT_AGE_KEEP_MESSAGES,
                 TOOL_RESULT_AGE_MIN_CHARS, TOOL_RESULT_AGE_QUANTUM,
             )
@@ -1037,7 +1037,7 @@ class MasterAgent:
         always knows what exists (teams, the agent model, available toolsets)
         without spending a tool call on trivia."""
         try:
-            from swarm_server.config import load_agents_config
+            from teams_server.config import load_agents_config
 
             cfg = load_agents_config()
             teams = cfg.get("teams") or {}
@@ -1051,7 +1051,7 @@ class MasterAgent:
                 line = "; ".join(parts)
             model = self._current_model or self.model()
             header = (
-                f"[SWARM STATE] teams: {line}. Agents run on model: {model}. "
+                f"[TEAMS STATE] teams: {line}. Agents run on model: {model}. "
                 f"Toolsets you can enable on an agent: {_available_toolsets_str()}."
             )
             return header
@@ -1071,7 +1071,7 @@ class MasterAgent:
         return True
 
     def _run_turn(self, message: str) -> None:
-        from swarm_server.agent import (
+        from teams_server.agent import (
             _set_hermes_home_override, _reset_hermes_home_override,
         )
 

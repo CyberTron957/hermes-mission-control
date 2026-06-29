@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Teams — Mission control for a swarm of agents</title>
+<title>Agent Teams — Mission control for a teams of agents</title>
 <meta name="description" content="A self-hostable team of full AI agents that collaborate 24/7 on your own hardware — browsing, building, publishing — and one real-time console to command them.">
 
 <!-- Favicons -->
@@ -15,15 +15,15 @@
 <!-- Open Graph / social share cards (absolute urls required by social scrapers). -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Agent Teams">
-<meta property="og:title" content="Agent Teams — Mission control for a swarm of agents">
+<meta property="og:title" content="Agent Teams — Mission control for a teams of agents">
 <meta property="og:description" content="A self-hostable team of full AI agents that browse, build & publish 24/7 on your own hardware — one real-time console to command them.">
 <meta property="og:image" content="https://missioncontrol.lunalabs-ai.com/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Agent Teams — mission control for a swarm of agents">
+<meta property="og:image:alt" content="Agent Teams — mission control for a teams of agents">
 <meta property="og:url" content="https://missioncontrol.lunalabs-ai.com/">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Agent Teams — Mission control for a swarm of agents">
+<meta name="twitter:title" content="Agent Teams — Mission control for a teams of agents">
 <meta name="twitter:description" content="A self-hostable team of full AI agents that browse, build & publish 24/7 on your own hardware — one real-time console to command them.">
 <meta name="twitter:image" content="https://missioncontrol.lunalabs-ai.com/og-image.png">
 
@@ -32,7 +32,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
-   HERMES SWARM — landing page
+   AGENT TEAMS — landing page
    Monochrome mission-control system, inherited from the dashboard.
    Pure black canvas, hairline borders, white accent; the only chroma
    is the live status palette (idle/busy/human/tool/danger).
@@ -123,7 +123,7 @@ img,svg,canvas{display:block;max-width:100%}
    HERO
    ========================================================= */
 .hero{position:relative;min-height:100svh;display:flex;flex-direction:column;justify-content:center;overflow:hidden;padding-top:64px}
-#swarm{position:absolute;inset:0;width:100%;height:100%;z-index:0}
+#teams{position:absolute;inset:0;width:100%;height:100%;z-index:0}
 .hero-scrim{position:absolute;inset:0;z-index:var(--z-scrim);pointer-events:none;
   background:
     radial-gradient(115% 85% at 50% 46%,rgba(0,0,0,.88) 0%,rgba(0,0,0,.7) 38%,rgba(0,0,0,.32) 62%,transparent 82%),
@@ -131,7 +131,7 @@ img,svg,canvas{display:block;max-width:100%}
 }
 @media (max-width:760px){
   .hero-scrim{background:linear-gradient(0deg,var(--bg) 4%,rgba(0,0,0,.55) 42%,rgba(0,0,0,.72) 100%)}
-  #swarm{opacity:.42}
+  #teams{opacity:.42}
 }
 /* HUD registration marks */
 .hud{position:absolute;inset:clamp(16px,3vw,30px);z-index:var(--z-scrim);pointer-events:none;color:var(--border-bright)}
@@ -470,7 +470,7 @@ footer .wrap{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px}
       <a href="../docs/getting-started.md">Docs</a>
     </div>
     <div class="nav-cta">
-      <a class="btn btn-ghost btn-sm" href="https://github.com/CyberTron957/hermes-mission-control" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn btn-ghost btn-sm" href="https://github.com/CyberTron957/agent-teams" target="_blank" rel="noopener">GitHub</a>
       <a class="btn btn-primary btn-sm" href="#install">Deploy</a>
     </div>
   </div>
@@ -480,7 +480,7 @@ footer .wrap{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px}
 
 <!-- ============ HERO ============ -->
 <header class="hero">
-  <canvas id="swarm" aria-hidden="true"></canvas>
+  <canvas id="teams" aria-hidden="true"></canvas>
   <div class="hero-scrim"></div>
   <div class="hud"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
 
@@ -491,7 +491,7 @@ footer .wrap{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px}
     </div>
     <h1 class="hero-title">
       <span class="ln"><span class="hero-line">Mission control</span></span>
-      <span class="ln"><span class="hero-line">for a swarm</span></span>
+      <span class="ln"><span class="hero-line">for a teams</span></span>
       <span class="ln"><span class="hero-line"><em>of agents.</em></span></span>
     </h1>
     <p class="hero-sub reveal" data-d="2">
@@ -501,7 +501,7 @@ footer .wrap{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px}
     </p>
     <div class="hero-cmd reveal" data-d="3">
       <span class="pr">$</span>
-      <code id="heroCmd">bash &lt;(curl -fsSL https://raw.githubusercontent.com/CyberTron957/hermes-mission-control/main/install.sh)</code>
+      <code id="heroCmd">bash &lt;(curl -fsSL https://raw.githubusercontent.com/CyberTron957/agent-teams/main/install.sh)</code>
       <button class="copy-inline" id="heroCopy" aria-label="Copy install command">Copy</button>
     </div>
     <div class="cmd-os" style="font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:var(--text-dim);text-transform:uppercase;margin-top:11px;display:flex;align-items:center;gap:8px">
@@ -534,7 +534,7 @@ footer .wrap{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px}
       <div class="sec-head reveal">
         <span class="label">[ 01 ] &nbsp;Deploy</span>
         <h2>Live in <em>one command.</em></h2>
-        <p class="sec-lead">One line of <code class="mono" style="color:var(--text)">curl</code> and the swarm is up.
+        <p class="sec-lead">One line of <code class="mono" style="color:var(--text)">curl</code> and the teams is up.
           It clones, inspects your machine, adopts your provider and keys, and verifies
           the whole stack before it hands you the dashboard.</p>
       </div>
@@ -609,7 +609,7 @@ footer .wrap{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px}
   <div class="wrap">
     <div class="sec-head reveal" style="max-width:64ch">
       <span class="label">[ 03 ] &nbsp;The console</span>
-      <h2>One pane of glass for the <em>whole swarm.</em></h2>
+      <h2>One pane of glass for the <em>whole teams.</em></h2>
       <p class="sec-lead">See each agent think, call a tool, and answer — in real time.
         Read team health at a glance, then intervene with one click: reply to a
         question, approve a change, or take over a browser.</p>
@@ -730,7 +730,7 @@ footer .wrap{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px}
       <div class="step reveal" data-d="1">
         <span class="num">01</span>
         <h3>Configure a provider</h3>
-        <p>One <code class="mono">hermes setup</code> wizard — pick from 40+ providers, paste a key, choose a model. The swarm reads it directly.</p>
+        <p>One <code class="mono">hermes setup</code> wizard — pick from 40+ providers, paste a key, choose a model. The teams reads it directly.</p>
         <span class="tag">~ 2 MINUTES</span>
       </div>
       <div class="step reveal" data-d="2">
@@ -783,7 +783,7 @@ footer .wrap{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px}
     <table class="spectable reveal" data-d="1">
       <tr><th>Runtime</th><td><b>Docker or Python 3.11+.</b> The image bundles Python, Hermes, Chromium and the dashboard; agents run contained inside it.</td></tr>
       <tr><th>Providers</th><td><b>40+ LLM providers</b> via <code class="mono">hermes setup</code> — Anthropic, OpenAI, OpenRouter, Groq, DeepSeek, local models — or a custom / OpenAI-compatible endpoint.</td></tr>
-      <tr><th>Access control</th><td><b>Single shared API key.</b> Set <code class="mono">SWARM_API_KEY</code> and every endpoint and the live WebSocket require it; the dashboard prompts once.</td></tr>
+      <tr><th>Access control</th><td><b>Single shared API key.</b> Set <code class="mono">TEAMS_API_KEY</code> and every endpoint and the live WebSocket require it; the dashboard prompts once.</td></tr>
       <tr><th>State</th><td><b>Everything on disk</b> under one data dir — team configs, task queues, conversation history, the shared project, and credentials. Rotating backups on every save.</td></tr>
       <tr><th>Observability</th><td><b><code class="mono">/health</code> + structured logs.</b> Uptime, queue depth, and backend reachability for any uptime monitor; logs to stdout or a rotating file.</td></tr>
       <tr><th>License</th><td><b>Open source.</b> Self-hostable, inspectable, yours to fork.</td></tr>
@@ -797,7 +797,7 @@ footer .wrap{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px}
      type="text/plain" keeps them out of the render tree; JS reads .textContent. -->
 <script type="text/plain" id="promptLocal">Install and run Agent Teams on this machine for me.
 
-Agent Teams (https://github.com/CyberTron957/hermes-mission-control) is a
+Agent Teams (https://github.com/CyberTron957/agent-teams) is a
 self-hosted multi-agent server with a real-time dashboard. Please:
 
 1. Check prerequisites first: Python 3.11+ (or Docker). If something is missing,
@@ -824,14 +824,14 @@ self-hosted multi-agent server with a real-time dashboard. Please:
 Keep my API key local. Don't commit anything or send data anywhere.</script>
 <script type="text/plain" id="promptVps">Deploy Agent Teams on this VPS, exposed safely over HTTPS.
 
-Agent Teams (https://github.com/CyberTron957/hermes-mission-control) is a
+Agent Teams (https://github.com/CyberTron957/agent-teams) is a
 self-hosted multi-agent server. Its agents can run terminal commands as the
 server user, so containment and auth matter. Please:
 
 1. Read docs/deploy-vps.md in the repo and follow its hardened path. Prefer the
    Docker route so the agents' terminal access stays contained.
 2. Clone the repo and bring it up with Docker Compose (restart: unless-stopped).
-3. Generate a strong SWARM_API_KEY and set it — it must guard every endpoint and
+3. Generate a strong TEAMS_API_KEY and set it — it must guard every endpoint and
    the WebSocket. Show it to me once and store it somewhere I can find it.
 4. Configure the LLM provider via `hermes setup` against the shared config —
    PAUSE and ask me for the provider + API key.
@@ -851,16 +851,16 @@ file that could be committed.</script>
 <section class="cta">
   <div class="cta-glow"></div>
   <div class="wrap">
-    <h2 class="reveal">Deploy the swarm <em>tonight.</em></h2>
+    <h2 class="reveal">Deploy the teams <em>tonight.</em></h2>
     <p class="sec-lead reveal" data-d="1">One clone, one command, one console. Your agents are waiting.</p>
     <div class="cta-cmd reveal" data-d="2">
       <span class="pr">$</span>
-      <code id="ctaCmd">bash &lt;(curl -fsSL https://raw.githubusercontent.com/CyberTron957/hermes-mission-control/main/install.sh)</code>
+      <code id="ctaCmd">bash &lt;(curl -fsSL https://raw.githubusercontent.com/CyberTron957/agent-teams/main/install.sh)</code>
       <button class="copy-inline" id="ctaCopy" aria-label="Copy command">Copy</button>
     </div>
     <div class="cta-actions reveal" data-d="3">
       <a class="btn btn-primary" href="../docs/getting-started.md">Read the guide</a>
-      <a class="btn btn-ghost" href="https://github.com/CyberTron957/hermes-mission-control" target="_blank" rel="noopener">
+      <a class="btn btn-ghost" href="https://github.com/CyberTron957/agent-teams" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-.87-.01-1.71-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 6.84c.85 0 1.71.12 2.51.34 1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.94-2.35 4.81-4.58 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.49A10.04 10.04 0 0 0 22 12.25C22 6.58 17.52 2 12 2z"/></svg>
         Star on GitHub
       </a>
@@ -882,7 +882,7 @@ file that could be committed.</script>
         </svg>
         <span class="wordmark">Agent<span>·</span>Teams</span>
       </a>
-      <p>A self-hostable multi-agent swarm server with a real-time mission-control dashboard.</p>
+      <p>A self-hostable multi-agent teams server with a real-time mission-control dashboard.</p>
     </div>
     <div class="foot-col">
       <h4>Deploy</h4>
@@ -894,11 +894,11 @@ file that could be committed.</script>
     </div>
     <div class="foot-col">
       <h4>Resources</h4>
-      <a href="../docs/getting-started.md">Docs</a><a href="../docs/deploy-vps.md">Deploy on a VPS</a><a href="https://github.com/CyberTron957/hermes-mission-control" target="_blank" rel="noopener">GitHub</a>
+      <a href="../docs/getting-started.md">Docs</a><a href="../docs/deploy-vps.md">Deploy on a VPS</a><a href="https://github.com/CyberTron957/agent-teams" target="_blank" rel="noopener">GitHub</a>
     </div>
   </div>
   <div class="wrap"><div class="foot-bottom">
-    <span>© 2026 HERMES SWARM · OPEN SOURCE</span>
+    <span>© 2026 AGENT TEAMS · OPEN SOURCE</span>
     <span style="display:flex;align-items:center;gap:8px"><span class="livedot"></span>ALL SYSTEMS NOMINAL</span>
   </div></div>
 </footer>
@@ -996,7 +996,7 @@ file that could be committed.</script>
   } else if(typeEl){ typeEl.textContent = 'review draft → tighten lede, flag 2 unverified claims'; if(cursor) cursor.style.display='none'; }
 
   /* ---------- install terminal tabs + copy ---------- */
-  var ONELINER = 'bash <(curl -fsSL https://raw.githubusercontent.com/CyberTron957/hermes-mission-control/main/install.sh)';
+  var ONELINER = 'bash <(curl -fsSL https://raw.githubusercontent.com/CyberTron957/agent-teams/main/install.sh)';
   var PANELS = {
     oneline: [
       {t:'cm', x:'# macOS & Linux'},
@@ -1005,22 +1005,22 @@ file that could be committed.</script>
     ],
     docker: [
       {t:'cm', x:'# everything bundled — python, hermes, chromium'},
-      {t:'cmd', x:'git clone https://github.com/CyberTron957/hermes-mission-control agent-teams && cd agent-teams'},
-      {t:'cmd', x:'docker compose run --rm swarm agent-teams setup'},
+      {t:'cmd', x:'git clone https://github.com/CyberTron957/agent-teams agent-teams && cd agent-teams'},
+      {t:'cmd', x:'docker compose run --rm teams agent-teams setup'},
       {t:'cmd', x:'docker compose up --build'},
       {t:'ok',  x:'✓ dashboard → http://127.0.0.1:8000'}
     ],
     clone: [
       {t:'cm', x:'# already have the repo? same script, from the clone'},
-      {t:'cmd', x:'git clone https://github.com/CyberTron957/hermes-mission-control agent-teams'},
+      {t:'cmd', x:'git clone https://github.com/CyberTron957/agent-teams agent-teams'},
       {t:'cmd', x:'cd agent-teams && bash install.sh'},
       {t:'ok',  x:'✓ serving on http://127.0.0.1:8000'}
     ]
   };
   var COPY = {
     oneline: ONELINER,
-    docker:  'git clone https://github.com/CyberTron957/hermes-mission-control agent-teams && cd agent-teams && docker compose run --rm swarm agent-teams setup && docker compose up --build',
-    clone:   'git clone https://github.com/CyberTron957/hermes-mission-control agent-teams && cd agent-teams && bash install.sh'
+    docker:  'git clone https://github.com/CyberTron957/agent-teams agent-teams && cd agent-teams && docker compose run --rm teams agent-teams setup && docker compose up --build',
+    clone:   'git clone https://github.com/CyberTron957/agent-teams agent-teams && cd agent-teams && bash install.sh'
   };
   var termBody = document.getElementById('termBody');
   var copyBtn = document.getElementById('copyTerm');
@@ -1078,8 +1078,8 @@ file that could be committed.</script>
     });
   });
 
-  /* ---------- hero swarm canvas ---------- */
-  var cv = document.getElementById('swarm');
+  /* ---------- hero teams canvas ---------- */
+  var cv = document.getElementById('teams');
   if(cv){
     var ctx = cv.getContext('2d');
     var DPR = Math.min(window.devicePixelRatio||1, 2);

@@ -46,9 +46,9 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, Optional
 
-from swarm_server.config import WORKSPACE_ROOT
+from teams_server.config import WORKSPACE_ROOT
 
-log = logging.getLogger("swarm.browser")
+log = logging.getLogger("teams.browser")
 
 # Base port for per-team CDP endpoints; each team gets the next free port up.
 _BASE_CDP_PORT = 9333

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for the embedded-browser handover relay (swarm_server/browser_stream).
+"""Tests for the embedded-browser handover relay (teams_server/browser_stream).
 
 Covers the pure logic — CDP page-target selection and dashboard→CDP message
 translation — plus the WS endpoint's team-validation guard. The live screencast
@@ -20,8 +20,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-import swarm_server.server as server_mod  # noqa: E402
-from swarm_server import browser_stream as bs  # noqa: E402
+import teams_server.server as server_mod  # noqa: E402
+from teams_server import browser_stream as bs  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ def test_ids_increment(ids):
 # Endpoint guard: unknown team is rejected before any relay
 # ---------------------------------------------------------------------------
 def test_browser_ws_unknown_team(monkeypatch):
-    monkeypatch.setattr(server_mod, "SWARM_API_KEY", "")
+    monkeypatch.setattr(server_mod, "TEAMS_API_KEY", "")
     monkeypatch.setattr(server_mod, "load_agents_config", lambda: {"teams": {}, "agents": {}})
     client = TestClient(server_mod.app)
     with client.websocket_connect("/teams/ghost/browser/ws") as ws:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for per-team daily spend guardrails (swarm_server/budget).
+"""Tests for per-team daily spend guardrails (teams_server/budget).
 
 Covers the tracker (metering, one-shot exceeded latch, override, limit-raise,
 UTC rollover, unpriced-model token fallback, thread-safety), rebuild from
@@ -23,14 +23,14 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import swarm_server.budget as budget_mod  # noqa: E402
-from swarm_server.budget import TeamBudgetTracker  # noqa: E402
+import teams_server.budget as budget_mod  # noqa: E402
+from teams_server.budget import TeamBudgetTracker  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-import swarm_server.server as server_mod  # noqa: E402
-from swarm_server.monitoring import MonitoringDB  # noqa: E402
+import teams_server.server as server_mod  # noqa: E402
+from teams_server.monitoring import MonitoringDB  # noqa: E402
 
 
-# Priced model in the swarm price map; "mystery-model" is intentionally unpriced.
+# Priced model in the teams price map; "mystery-model" is intentionally unpriced.
 PRICED = "deepseek-v4-flash"
 
 
@@ -54,7 +54,7 @@ def tracker(monkeypatch):
     monkeypatch.setattr(budget_mod, "_broadcast",
                         lambda evt, payload: events.append((evt, payload)), raising=False)
     # _emit imports _broadcast lazily from websocket; patch there too.
-    import swarm_server.websocket as ws_mod
+    import teams_server.websocket as ws_mod
     monkeypatch.setattr(ws_mod, "_broadcast",
                         lambda evt, payload: events.append((evt, payload)))
     return t, limits, events
@@ -192,7 +192,7 @@ def test_rebuild_from_db(tmp_path, monkeypatch):
 # config helpers
 # ---------------------------------------------------------------------------
 def test_get_team_budget_sanitizes():
-    from swarm_server.config import get_team_budget
+    from teams_server.config import get_team_budget
     cfg = {"teams": {"t1": {"budget": {"daily_usd": "5.5", "daily_tokens": -3}}}}
     b = get_team_budget(cfg, "t1")
     assert b["daily_usd"] == 5.5
@@ -205,13 +205,13 @@ def test_get_team_budget_sanitizes():
 # ---------------------------------------------------------------------------
 @pytest.fixture()
 def client(monkeypatch):
-    monkeypatch.setattr(server_mod, "SWARM_API_KEY", "")
+    monkeypatch.setattr(server_mod, "TEAMS_API_KEY", "")
     fresh = TeamBudgetTracker()
     monkeypatch.setattr(fresh, "_limits",
                         lambda team_id: {"daily_usd": 0.0, "daily_tokens": 0})
-    monkeypatch.setattr("swarm_server.budget.budget_tracker", fresh)
+    monkeypatch.setattr("teams_server.budget.budget_tracker", fresh)
     saved = {}
-    monkeypatch.setattr("swarm_server.config.set_team_budget",
+    monkeypatch.setattr("teams_server.config.set_team_budget",
                         lambda tid, usd, toks: saved.update({tid: (usd, toks)}) or {})
     return TestClient(server_mod.app), saved
 

@@ -20,7 +20,7 @@ RUN echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/sources.lis
 WORKDIR /app
 COPY . /app
 
-# Install the swarm + its deps (pulls hermes-agent[all]).
+# Install the teams + its deps (pulls hermes-agent[all]).
 RUN pip install --no-cache-dir .
 
 # Chromium for the browser-publishing tools.
@@ -35,9 +35,9 @@ RUN python -m playwright install --with-deps chromium 2>/dev/null \
     || echo "WARN: Chromium install failed — browser tools will be unavailable"
 
 # Persistent writable state (configs, queues, agent workspaces, monitoring db).
-ENV SWARM_DATA_DIR=/data \
-    SWARM_HOST=0.0.0.0 \
-    SWARM_PORT=8000
+ENV TEAMS_DATA_DIR=/data \
+    TEAMS_HOST=0.0.0.0 \
+    TEAMS_PORT=8000
 VOLUME ["/data"]
 EXPOSE 8000
 

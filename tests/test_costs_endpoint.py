@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Tests for GET /teams/{team_id}/costs — aggregation of REAL provider token
-counts from token_usage events, swarm-side pricing, cache-hit %, legacy-row
+counts from token_usage events, teams-side pricing, cache-hit %, legacy-row
 differencing, team scoping, and the sweep queued/skipped counters.
 
 Uses a real MonitoringDB on a temp path + FastAPI TestClient; no LLM, no
@@ -20,8 +20,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-import swarm_server.server as server_mod  # noqa: E402
-from swarm_server.monitoring import MonitoringDB  # noqa: E402
+import teams_server.server as server_mod  # noqa: E402
+from teams_server.monitoring import MonitoringDB  # noqa: E402
 
 
 TEAM_CFG = {

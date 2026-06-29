@@ -25,7 +25,7 @@ import logging
 import urllib.request
 from typing import Any, Dict, List, Optional
 
-log = logging.getLogger("swarm.browser.stream")
+log = logging.getLogger("teams.browser.stream")
 
 # Screencast tuning — JPEG keeps frames small enough to stream smoothly over a
 # WAN; the cap bounds bandwidth on large viewports.
@@ -135,7 +135,7 @@ async def relay(client_ws, team_id: str) -> None:
     CDP socket. Errors are reported to the client as a ``{type:'error'}`` frame.
     """
     from websockets.asyncio.client import connect as ws_connect
-    from swarm_server.browser_pool import team_browser_manager
+    from teams_server.browser_pool import team_browser_manager
 
     loop = asyncio.get_running_loop()
 

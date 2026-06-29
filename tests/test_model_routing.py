@@ -1,13 +1,13 @@
 """Phase 1 — route-aware config + pricing.
 
-The swarm pins context window / auxiliary model / vision and prices tokens itself
+The teams pins context window / auxiliary model / vision and prices tokens itself
 ONLY for a custom / OpenAI-compatible endpoint (any base_url), which hides the
 real model from Hermes. For a NATIVE provider it must DEFER to Hermes so its
 always-current model metadata + pricing apply. These tests pin that split.
 
 A custom endpoint is configured the normal way — `hermes setup`'s custom
 provider, or the dashboard — which surfaces here as an explicit base_url. There
-is no swarm-specific proxy env var.
+is no teams-specific proxy env var.
 """
 
 import tempfile
@@ -15,8 +15,8 @@ from pathlib import Path
 
 import yaml
 
-from swarm_server.config import write_agent_hermes_config
-from swarm_server.model_config import estimate_cost_usd
+from teams_server.config import write_agent_hermes_config
+from teams_server.model_config import estimate_cost_usd
 
 
 def _write(**kw):
@@ -41,7 +41,7 @@ def test_native_route_defers_window_aux_vision():
     # No managed aux pins → Hermes picks a cheap default_aux_model + native vision.
     for task in ("compression", "title_generation", "vision", "web_extract"):
         assert task not in aux
-    # Compression itself stays enabled (a swarm tuning choice, route-independent).
+    # Compression itself stays enabled (a teams tuning choice, route-independent).
     assert cfg["compression"]["enabled"] is True
 
 

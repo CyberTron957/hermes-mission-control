@@ -7,7 +7,7 @@ import sys
 
 def main():
     print("=" * 60)
-    print("  Swarm Race Conditions & 3-Agent Integration Tests")
+    print("  Teams Race Conditions & 3-Agent Integration Tests")
     print("=" * 60)
 
     env = {
@@ -15,7 +15,7 @@ def main():
         "PYTHONPATH": os.environ.get("HERMES_AGENT_PATH", os.path.expanduser("~/.hermes/hermes-agent"))
     }
     server_process = subprocess.Popen(
-        [sys.executable, "-u", "test_swarm.py"],
+        [sys.executable, "-u", "test_teams.py"],
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -39,7 +39,7 @@ def main():
             server_process.terminate()
             return
 
-        # Let the initial trigger execute first (it has a 3.0s delay in test_swarm.py)
+        # Let the initial trigger execute first (it has a 3.0s delay in test_teams.py)
         print("Waiting for startup initial trigger to enqueue task...")
         time.sleep(5)
 
@@ -111,7 +111,7 @@ def main():
         assert r3.status_code == 400, "Sending response to idle agent should fail with 400"
 
         # =====================================================================
-        # 3-Agent Swarm Test: Editor -> Researcher -> Reviewer -> Editor
+        # 3-Agent Teams Test: Editor -> Researcher -> Reviewer -> Editor
         # =====================================================================
         print("\n--- TEST case 4: 3-Agent Chain (Editor -> Researcher -> Reviewer -> Editor) ---")
         
@@ -125,7 +125,7 @@ def main():
         r = httpx.post("http://127.0.0.1:8000/agent/editor/task", json={"from_agent": "test_script", "payload": payload})
         print("Editor chain task queued:", r.json())
 
-        # Wait to let the swarm run the chain.
+        # Wait to let the teams run the chain.
         # Editor will send a message to Researcher.
         # In Researcher's sweep, it will read it, write a summary/result, and send it to Reviewer.
         # In Reviewer's sweep, it will approve it and send it to Editor.

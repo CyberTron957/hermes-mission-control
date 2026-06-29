@@ -1,6 +1,6 @@
 """Per-team daily spend guardrails with auto-pause.
 
-A 24/7 swarm on a paid API can quietly burn money overnight. This module meters
+A 24/7 teams on a paid API can quietly burn money overnight. This module meters
 each team's spend for the current UTC day and, when a team crosses its cap, makes
 ``is_blocked(team_id)`` return True — the AgentDaemon sweep loop then HOLDS that
 team's work (exactly like the existing infra-outage hold: tasks are kept, not
@@ -25,7 +25,7 @@ import threading
 import time
 from typing import Any, Dict, Optional, Set
 
-log = logging.getLogger("swarm.budget")
+log = logging.getLogger("teams.budget")
 
 _LIMITS_TTL_SECONDS = 15.0
 
@@ -62,7 +62,7 @@ class TeamBudgetTracker:
             self._limits_cache_at = now
         if team_id not in self._limits_cache:
             try:
-                from swarm_server.config import get_team_budget, load_agents_config
+                from teams_server.config import get_team_budget, load_agents_config
                 self._limits_cache[team_id] = get_team_budget(load_agents_config(), team_id)
             except Exception:
                 self._limits_cache[team_id] = {"daily_usd": 0.0, "daily_tokens": 0}
@@ -99,7 +99,7 @@ class TeamBudgetTracker:
         """Meter one completed turn. Latches + broadcasts once when a team first
         crosses its cap. provider/base_url select native (Hermes) vs proxy (table)
         pricing."""
-        from swarm_server.model_config import estimate_cost_usd
+        from teams_server.model_config import estimate_cost_usd
         events = []
         newly_exceeded = False
         with self._lock:
@@ -195,7 +195,7 @@ class TeamBudgetTracker:
         are counted; legacy cumulative rows are pre-deploy history."""
         import json
 
-        from swarm_server.model_config import estimate_cost_usd
+        from teams_server.model_config import estimate_cost_usd
         agent_team = {name: a.get("team_id", "default")
                       for name, a in (cfg.get("agents") or {}).items()}
         cfg_models = {name: (a.get("model") or "")
@@ -244,12 +244,12 @@ class TeamBudgetTracker:
             payload["reason"] = reason
         payload["timestamp"] = time.time()
         try:
-            from swarm_server.websocket import _broadcast
+            from teams_server.websocket import _broadcast
             _broadcast(event, payload)
         except Exception as e:
             log.debug("[budget] broadcast %s failed: %s", event, e)
         try:
-            from swarm_server.monitoring import monitor_db
+            from teams_server.monitoring import monitor_db
             monitor_db.log_event(team_id, event, data={
                 "spent_usd": payload["spent_usd"], "limit_usd": payload["limit_usd"],
                 "spent_tokens": payload["spent_tokens"], "reason": reason or "",

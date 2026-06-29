@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-P2P Multi-Agent Swarm Testbed
+P2P Multi-Agent Teams Testbed
 ==============================
 2-agent cluster (Editor + Researcher) using the Hermes Agent SDK.
 
@@ -12,7 +12,7 @@ Architecture:
   - Connects to a real LiteLLM proxy on port 4000.
 
 Run:
-    PYTHONPATH=$HERMES_AGENT_PATH python3 test_swarm.py
+    PYTHONPATH=$HERMES_AGENT_PATH python3 test_teams.py
 """
 
 import asyncio
@@ -41,7 +41,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
     datefmt="%H:%M:%S",
 )
-log = logging.getLogger("swarm")
+log = logging.getLogger("teams")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -119,7 +119,7 @@ AGENTS = load_agents_config()
 # ---------------------------------------------------------------------------
 # Event Bus — Real-Time Monitoring Infrastructure
 # ---------------------------------------------------------------------------
-class SwarmEventBus:
+class TeamsEventBus:
     """In-memory event pub/sub for real-time dashboard updates."""
 
     def __init__(self):
@@ -154,7 +154,7 @@ class SwarmEventBus:
                 except:
                     pass
 
-event_bus = SwarmEventBus()
+event_bus = TeamsEventBus()
 
 # Rolling event history (last 500 events — for dashboard initial load)
 EVENT_HISTORY_MAX = 500
@@ -171,9 +171,9 @@ def record_event(event_type: str, data: dict):
 
 
 # ---------------------------------------------------------------------------
-# Log Capture Handler — streams log records as swarm events
+# Log Capture Handler — streams log records as teams events
 # ---------------------------------------------------------------------------
-class SwarmLogHandler(logging.Handler):
+class TeamsLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord):
         try:
             msg = self.format(record)
@@ -284,7 +284,7 @@ _SEND_PEER_MESSAGE_TOOL_SCHEMA = {
     "function": {
         "name": "send_peer_message",
         "description": (
-            "Send a message to another agent in the swarm. The target agent will pick it up "
+            "Send a message to another agent in the teams. The target agent will pick it up "
             "on its next sweep (within 10 seconds) and process it. Use this to chat, pass "
             "results, or delegate work between agents."
         ),
@@ -360,7 +360,7 @@ def _register_send_peer_message_tool() -> None:
                 toolset="custom",
                 schema=_SEND_PEER_MESSAGE_TOOL_SCHEMA["function"],
                 handler=_send_peer_message_handler,
-                description="Send a message to another swarm agent.",
+                description="Send a message to another teams agent.",
             )
             log.info("[send_peer_message] Tool registered in Hermes registry")
     except Exception as exc:
@@ -640,7 +640,7 @@ class AgentDaemon:
 # ---------------------------------------------------------------------------
 # FastAPI App
 # ---------------------------------------------------------------------------
-app = FastAPI(title="Swarm Testbed", version="0.1.0")
+app = FastAPI(title="Teams Testbed", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -889,15 +889,15 @@ async def agent_logs(agent_name: str):
 # ---------------------------------------------------------------------------
 @app.on_event("startup")
 async def on_startup():
-    # Attach SwarmLogHandler to root logger for live log streaming
+    # Attach TeamsLogHandler to root logger for live log streaming
     root_logger = logging.getLogger()
-    swarm_handler = SwarmLogHandler()
-    swarm_handler.setLevel(logging.INFO)
-    swarm_handler.setFormatter(logging.Formatter(
+    teams_handler = TeamsLogHandler()
+    teams_handler.setLevel(logging.INFO)
+    teams_handler.setFormatter(logging.Formatter(
         "%(asctime)s [%(levelname)s] %(name)s — %(message)s",
         datefmt="%H:%M:%S",
     ))
-    root_logger.addHandler(swarm_handler)
+    root_logger.addHandler(teams_handler)
 
     # Clean up previous queue databases for a clean test run
     for agent_name, cfg in AGENTS.items():
@@ -926,7 +926,7 @@ async def on_shutdown():
 
 
 # ---------------------------------------------------------------------------
-# Human manager trigger — kick off the swarm scenario
+# Human manager trigger — kick off the teams scenario
 # ---------------------------------------------------------------------------
 async def _trigger_editor_after_startup(delay: float = 3.0):
     """After server is up, inject the initial task into the Editor queue."""
@@ -957,14 +957,14 @@ async def schedule_trigger():
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     log.info("=" * 60)
-    log.info("  P2P Multi-Agent Swarm Testbed")
+    log.info("  P2P Multi-Agent Teams Testbed")
     log.info("  Workspace: %s", WORKSPACE_ROOT)
     log.info("  LiteLLM  : %s", LITELLM_API_BASE)
     log.info("  Sweep    : every %ds", SWEEP_INTERVAL_SECONDS)
     log.info("=" * 60)
 
     uvicorn.run(
-        "test_swarm:app",
+        "test_teams:app",
         host=SERVER_HOST,
         port=SERVER_PORT,
         log_level="info",

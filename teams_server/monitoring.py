@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-log = logging.getLogger("swarm.monitoring")
+log = logging.getLogger("teams.monitoring")
 
 
 def _estimate_tokens(content: str) -> int:
@@ -942,6 +942,6 @@ class MonitoringDB:
 
 
 # Global singleton instance
-from swarm_server.config import MONITORING_DB  # noqa: E402
+from teams_server.config import MONITORING_DB  # noqa: E402
 
 monitor_db = MonitoringDB(MONITORING_DB)

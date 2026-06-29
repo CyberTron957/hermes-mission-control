@@ -22,8 +22,8 @@ Wants=network-online.target
 Type=simple
 User=hermes
 Group=hermes
-# All runtime knobs (SWARM_API_KEY, SWARM_LLM_BASE_URL, SWARM_LLM_API_KEY,
-# SWARM_DATA_DIR, SWARM_LOG_FILE, SWARM_HOST/PORT, …) live here. chmod 600 it.
+# All runtime knobs (TEAMS_API_KEY, TEAMS_LLM_BASE_URL, TEAMS_LLM_API_KEY,
+# TEAMS_DATA_DIR, TEAMS_LOG_FILE, TEAMS_HOST/PORT, …) live here. chmod 600 it.
 EnvironmentFile=/etc/agent-teams.env
 WorkingDirectory=/var/lib/agent-teams
 ExecStart=/var/lib/agent-teams/venv/bin/agent-teams up

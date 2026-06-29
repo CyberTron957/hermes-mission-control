@@ -8,7 +8,7 @@ from typing import Optional, Set
 
 from fastapi import WebSocket
 
-log = logging.getLogger("swarm.websocket")
+log = logging.getLogger("teams.websocket")
 
 # ---------------------------------------------------------------------------
 # Global async state

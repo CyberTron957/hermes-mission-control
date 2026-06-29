@@ -1,15 +1,15 @@
-"""Model configuration: a swarm-wide DEFAULT plus per-agent OVERRIDES, resolved
+"""Model configuration: a teams-wide DEFAULT plus per-agent OVERRIDES, resolved
 into the effective backend each agent actually uses.
 
 Hermes-native: the default is stored in Hermes' OWN config (``config.yaml``
 ``model:`` + the provider's key in ``.env``) using Hermes' ``load_config`` /
 ``save_config`` / ``save_env_value`` — wrapped in a HERMES_HOME override so we
-target a swarm-managed home (``data/.hermes-shared``) instead of the process
+target a teams-managed home (``data/.hermes-shared``) instead of the process
 default. The provider catalogue comes straight from Hermes' ``PROVIDER_REGISTRY``
 (every provider Hermes supports), plus OpenRouter (which Hermes special-cases)
 and a Custom OpenAI-compatible option.
 
-Resolution precedence: per-agent override → swarm default → an existing
+Resolution precedence: per-agent override → teams default → an existing
 ``~/.hermes`` setup (offered to adopt) → the legacy LiteLLM proxy fallback, so
 existing deployments keep running until the operator picks a model.
 """
@@ -20,18 +20,18 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from swarm_server.config import (
+from teams_server.config import (
     DATA_ROOT,
     ensure_hermes_importable,
 )
 
-log = logging.getLogger("swarm.model")
+log = logging.getLogger("teams.model")
 
-# Swarm-wide default lives here (Hermes config format; on the data volume).
+# Teams-wide default lives here (Hermes config format; on the data volume).
 SHARED_HERMES_HOME = DATA_ROOT / ".hermes-shared"
 # The user's personal Hermes home (detect an existing setup to offer/adopt).
 GLOBAL_HERMES_HOME = Path(
-    os.environ.get("SWARM_GLOBAL_HERMES_HOME") or (Path.home() / ".hermes")
+    os.environ.get("TEAMS_GLOBAL_HERMES_HOME") or (Path.home() / ".hermes")
 )
 
 # Providers NOT in Hermes' registry that we still want to offer (OpenAI-compatible).
@@ -110,16 +110,16 @@ def _read_env_value(env_path: Path, key: str) -> str:
 
 def import_hermes_secrets() -> List[str]:
     """Load existing Hermes ``.env`` secrets into THIS process's environment, so
-    swarm agents inherit every provider/tool API key already configured for
+    teams agents inherit every provider/tool API key already configured for
     Hermes — not just the model provider's key.
 
-    Reads two homes: the swarm's shared home (``data/.hermes-shared`` — where
+    Reads two homes: the teams's shared home (``data/.hermes-shared`` — where
     ``hermes setup`` writes in the Docker flow) takes precedence, then the user's
     personal ``~/.hermes`` (the pip/local flow). Agents run in-process (each under
     its own HERMES_HOME), so values in ``os.environ`` are visible to all of them;
     Hermes' web/tool plugins read them via ``os.getenv``. NON-overriding:
     anything already set in the environment (explicit server/deployment config,
-    SWARM_*) wins, so this never clobbers it. Returns the names imported (for
+    TEAMS_*) wins, so this never clobbers it. Returns the names imported (for
     logging — values are never logged).
     """
     imported: List[str] = []
@@ -271,11 +271,11 @@ def is_model_configured() -> bool:
 def resolve_model(agent_cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Effective {provider, model, base_url, api_key, source, display_provider}.
 
-    Per-agent override (layered over) → swarm default → ~/.hermes. The routing
+    Per-agent override (layered over) → teams default → ~/.hermes. The routing
     provider is the native Hermes provider id, EXCEPT OpenAI-compatible providers
     (OpenRouter/Custom/etc.) which route via ``custom`` + base_url. A custom /
     OpenAI-compatible endpoint is configured the same way as any provider —
-    through `hermes setup` (or the dashboard) — not via swarm-specific env vars.
+    through `hermes setup` (or the dashboard) — not via teams-specific env vars.
     """
     agent_cfg = agent_cfg or {}
     default = get_default_model()
@@ -283,7 +283,7 @@ def resolve_model(agent_cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         base = dict(default)
         base_source = "default"
     else:
-        # No swarm default yet: adopt the user's NATIVE Hermes setup (~/.hermes),
+        # No teams default yet: adopt the user's NATIVE Hermes setup (~/.hermes),
         # which is the canonical place to configure a provider — `hermes setup`
         # writes there.
         glob = detect_global_hermes_model()
@@ -350,7 +350,7 @@ def resolve_model(agent_cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Swarm-side pricing fallback for custom / OpenAI-compatible endpoint models
+# Teams-side pricing fallback for custom / OpenAI-compatible endpoint models
 # only — USD per 1M tokens: (input, output, cached_input). When a model is served
 # behind a custom base_url, Hermes can't see the real model to price it
 # (resolve_billing_route → billing_mode "unknown"), so the /teams/{id}/costs
@@ -399,10 +399,10 @@ def estimate_cost_usd(model: str, input_tokens: int, output_tokens: int,
     reads (Hermes' canonical usage already subtracts them).
 
     Custom / OpenAI-compatible endpoint models are opaque to Hermes — it sees
-    only the alias served behind the base_url — so they're priced from the swarm
+    only the alias served behind the base_url — so they're priced from the teams
     table below. For a NATIVE provider (the `hermes setup` path) Hermes prices
     precisely, so we DEFER to it: that's how a native-provider user sees correct
-    costs without the swarm re-encoding every provider's price sheet (and without
+    costs without the teams re-encoding every provider's price sheet (and without
     the table going stale as new models ship)."""
     prices = MODEL_PRICES_PER_MILLION.get((model or "").strip().lower())
     if prices:

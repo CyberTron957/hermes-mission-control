@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from collections import deque
 
-from swarm_server.config import (
+from teams_server.config import (
     AUTONOMOUS_HEARTBEAT_SECONDS,
     DEFAULT_MAX_ITERATIONS,
     HEARTBEAT_BACKOFF_MAX_DOUBLINGS,
@@ -45,7 +45,7 @@ from swarm_server.config import (
     save_agent_config,
     write_agent_hermes_config,
 )
-from swarm_server.prompts import (
+from teams_server.prompts import (
     AUTONOMOUS_HEARTBEAT_PROMPT,
     CRON_WAKEUP_PROMPT,
     DIRECTIVE_HEARTBEAT_PROMPT,
@@ -60,18 +60,18 @@ from swarm_server.prompts import (
     compose_soul_identity,
     strip_stale_live_context,
 )
-from swarm_server.browser_pool import team_browser_manager
-from swarm_server.monitoring import monitor_db
-from swarm_server.queue import TaskQueue
-from swarm_server.tools import (
+from teams_server.browser_pool import team_browser_manager
+from teams_server.monitoring import monitor_db
+from teams_server.queue import TaskQueue
+from teams_server.tools import (
     _ASK_HUMAN_TOOL_SCHEMA,
     _SEND_PEER_MESSAGE_TOOL_SCHEMA,
     _daemon_registry,
     _register_custom_tools,
 )
-from swarm_server.websocket import _agent_init_lock, _broadcast, ws_broadcaster
+from teams_server.websocket import _agent_init_lock, _broadcast, ws_broadcaster
 
-log = logging.getLogger("swarm.agent")
+log = logging.getLogger("teams.agent")
 
 AGENT_STATE_IDLE = "idle"
 AGENT_STATE_BUSY = "busy"
@@ -200,7 +200,7 @@ def _ensure_hermes_on_path() -> None:
 
     Delegates to config.ensure_hermes_importable so resolution is defined in one
     place (see its docstring for the lookup order)."""
-    from swarm_server.config import ensure_hermes_importable
+    from teams_server.config import ensure_hermes_importable
 
     ensure_hermes_importable()
 
@@ -290,12 +290,12 @@ def _reset_terminal_cwd_override() -> None:
     _terminal_cwd_tls.value = None
 
 
-def _inject_swarm_tools(agent, *, is_supervisor: bool,
+def _inject_teams_tools(agent, *, is_supervisor: bool,
                         disabled: Optional[Set[str]] = None) -> Set[str]:
-    """Expose the swarm's coordination/util tools on a freshly-built AIAgent.
+    """Expose the teams's coordination/util tools on a freshly-built AIAgent.
 
     This is the ONE place that mutates ``agent.tools`` / ``agent.valid_tool_names``
-    (Hermes internals the swarm reaches into) — kept a pure function of the agent +
+    (Hermes internals the teams reaches into) — kept a pure function of the agent +
     role so that surface is both guardable (one spot to fix on a Hermes change) and
     unit-testable without building a real agent. Returns the set of names added.
 
@@ -304,7 +304,7 @@ def _inject_swarm_tools(agent, *, is_supervisor: bool,
     supervisors get the pause/resume brake. Any tool already present, or disabled
     per-agent (dashboard picker / disabled_toolsets), is skipped.
     """
-    from swarm_server.tools import (
+    from teams_server.tools import (
         _SEND_PEER_MESSAGE_TOOL_SCHEMA, _ASK_HUMAN_TOOL_SCHEMA,
         _REQUEST_HUMAN_TAKEOVER_TOOL_SCHEMA, _LOG_DECISION_TOOL_SCHEMA,
         _RECALL_DECISIONS_TOOL_SCHEMA, _LOG_ACTION_TOOL_SCHEMA,
@@ -351,7 +351,7 @@ def _inject_swarm_tools(agent, *, is_supervisor: bool,
 
     if not is_supervisor:
         # Per-team credential registry (workers authenticate; supervisors don't).
-        from swarm_server.credentials import (
+        from teams_server.credentials import (
             GET_CREDENTIAL_TOOL_SCHEMA, LIST_CREDENTIALS_TOOL_SCHEMA,
         )
         add(GET_CREDENTIAL_TOOL_SCHEMA)
@@ -359,7 +359,7 @@ def _inject_swarm_tools(agent, *, is_supervisor: bool,
         # GUI-grade browser tools, only where Hermes' own browser toolset is live
         # (browser_navigate present) — they drive the same session.
         if "browser_navigate" in existing:
-            from swarm_server.browser_gui_tools import GUI_BROWSER_TOOL_SCHEMAS
+            from teams_server.browser_gui_tools import GUI_BROWSER_TOOL_SCHEMAS
             for _gui_schema in GUI_BROWSER_TOOL_SCHEMAS:
                 add(_gui_schema)
 
@@ -439,7 +439,7 @@ class AgentDaemon:
         # Resolved model name + route (set in _ensure_agent) — logged with every
         # token_usage event so cost attribution survives mid-life model swaps.
         # provider/base_url let the cost meter pick native (Hermes) vs proxy
-        # (swarm table) pricing per turn.
+        # (teams table) pricing per turn.
         self._current_model = ""
         self._current_provider = ""
         self._current_base_url = ""
@@ -465,7 +465,7 @@ class AgentDaemon:
         self._sweep_interval = self._resolve_sweep_interval(cfg)
         # Per-agent autonomous-heartbeat interval (falls back to the global
         # default). Configurable from the UI so each agent's 24/7 cadence is tuned
-        # independently of the launch-time SWARM_HEARTBEAT_SECONDS.
+        # independently of the launch-time TEAMS_HEARTBEAT_SECONDS.
         self._heartbeat_seconds = self._resolve_heartbeat_interval(cfg)
         # Scheduled cron wake-ups. self._crons is the config list; self._cron_next
         # maps cron-id -> next fire timestamp; self._cron_last -> last fire ts;
@@ -552,7 +552,7 @@ class AgentDaemon:
     def _load_crons(self, cfg: Dict[str, Any]) -> None:
         """(Re)load cron wake-ups from config, preserving the next-fire time of any
         schedule that didn't change so an unrelated config save can't reset timers."""
-        from swarm_server.cron import cron_next
+        from teams_server.cron import cron_next
 
         crons = list(cfg.get("crons") or [])
         now = time.time()
@@ -691,15 +691,15 @@ class AgentDaemon:
 
                 # Per-agent model + sampling knobs (configurable from the UI;
                 # fall back to the resolved default when unset).
-                # Effective backend: per-agent override → swarm default → ~/.hermes.
-                from swarm_server.model_config import resolve_model
+                # Effective backend: per-agent override → teams default → ~/.hermes.
+                from teams_server.model_config import resolve_model
 
                 eff = resolve_model(self.cfg)
                 model = eff["model"]
                 if not model:
                     raise RuntimeError(
                         f"No model configured for agent '{self.name}'. Run `hermes setup` "
-                        "to pick a provider + model (the swarm reads ~/.hermes), or set a "
+                        "to pick a provider + model (the teams reads ~/.hermes), or set a "
                         "per-agent model in the dashboard. For a custom / OpenAI-compatible "
                         "endpoint, choose the 'custom' provider in `hermes setup`."
                     )
@@ -802,7 +802,7 @@ class AgentDaemon:
                         extra_kwargs["max_iterations"] = int(mi)
                     except (TypeError, ValueError):
                         pass
-                # No per-agent override -> apply the swarm-wide turn ceiling.
+                # No per-agent override -> apply the teams-wide turn ceiling.
                 # Unbounded turns were observed running 49 tool calls in one go,
                 # monopolizing the agent's thread and dodging between-turn review.
                 if "max_iterations" not in extra_kwargs and DEFAULT_MAX_ITERATIONS > 0:
@@ -818,13 +818,13 @@ class AgentDaemon:
                 if en_ts:
                     extra_kwargs["enabled_toolsets"] = en_ts
                 dis_ts = _as_list(self.cfg.get("disabled_toolsets"))
-                # ALWAYS deny the Architect's swarm_master toolset to team agents.
+                # ALWAYS deny the Architect's teams_master toolset to team agents.
                 # It is registered in the shared Hermes registry, so a team agent
                 # initialized without an enabled_toolsets whitelist would otherwise
                 # auto-load it (get_tool_definitions(None) = all toolsets) and gain
                 # team/agent-mutating powers. The master's caller-guard is a second
                 # line of defense; this is the first.
-                dis_ts = (dis_ts or []) + ["swarm_master"]
+                dis_ts = (dis_ts or []) + ["teams_master"]
                 extra_kwargs["disabled_toolsets"] = dis_ts
 
                 if _eff_provider:
@@ -846,10 +846,10 @@ class AgentDaemon:
                 )
                 _register_custom_tools()
 
-                # Expose the swarm's coordination/util tools on the freshly-built
+                # Expose the teams's coordination/util tools on the freshly-built
                 # agent (per-agent, role-aware). Pure module-level function so the
                 # one Hermes-internal mutation site stays guardable + unit-testable.
-                _inject_swarm_tools(
+                _inject_teams_tools(
                     self._ai_agent,
                     is_supervisor=bool(self.cfg.get("is_supervisor")),
                     disabled=set(dis_ts or []),
@@ -1266,7 +1266,7 @@ class AgentDaemon:
             return
         # Claim a bounded batch first. If there's nothing to do, stay idle
         # SILENTLY — no state flip, no broadcast, no event. This is what keeps
-        # an idle 24/7 swarm from drowning the monitoring log in busy/idle churn.
+        # an idle 24/7 teams from drowning the monitoring log in busy/idle churn.
         tasks = self.queue.drain_pending(limit=MAX_BATCH_SIZE)
         if not tasks:
             return
@@ -1311,7 +1311,7 @@ class AgentDaemon:
         """True when this agent's team is over its daily spend cap. Cheap
         (in-memory dict lookups) — safe to call every sweep tick."""
         try:
-            from swarm_server.budget import budget_tracker
+            from teams_server.budget import budget_tracker
             return budget_tracker.is_blocked(self.cfg.get("team_id", "default"))
         except Exception:
             return False
@@ -1671,7 +1671,7 @@ class AgentDaemon:
         else:
             lines.append("Open delegations involving your agents: none")
         try:
-            from swarm_server.tools import get_pending_questions
+            from teams_server.tools import get_pending_questions
 
             qs = [q for q in get_pending_questions()
                   if q.get("status") == "pending" and q.get("agent_name") in peers]
@@ -1878,7 +1878,7 @@ class AgentDaemon:
         """
         if self._stop_requested or not self._cron_next:
             return
-        from swarm_server.cron import cron_next
+        from teams_server.cron import cron_next
 
         now = time.time()
         # Snapshot ids so rescheduling inside the loop can't churn the dict iter.
@@ -1920,7 +1920,7 @@ class AgentDaemon:
             # (max_runs=1) from recurring forever and monopolising the agent.
             if c.get("max_runs"):
                 try:
-                    from swarm_server.config import record_cron_fire
+                    from teams_server.config import record_cron_fire
                     res = record_cron_fire(self.name, cid)
                 except Exception as e:  # noqa: BLE001 — never let bookkeeping abort a fire
                     log.warning("[%s] record_cron_fire failed for %s: %s", self.name, cid, e)
@@ -1961,7 +1961,7 @@ class AgentDaemon:
         Purely for the dashboard's real-time trace — NOT persisted to
         monitoring.db (the final answer + tool calls are still logged at the end
         of the batch as before). Skipped entirely when no dashboard is connected
-        so a 24/7 swarm pays nothing for this when nobody is watching (matters for
+        so a 24/7 teams pays nothing for this when nobody is watching (matters for
         the high-frequency token stream). Runs on the agent's worker thread;
         _broadcast hops to the event loop thread-safely.
         """
@@ -2285,7 +2285,7 @@ class AgentDaemon:
             # so we log this batch's per-turn deltas plus the running totals —
             # actual numbers from the provider, not the char-based message
             # estimate. (Hermes' estimated_cost_usd is always 0 for proxy
-            # models, so pricing lives swarm-side: see MODEL_PRICES_PER_MILLION
+            # models, so pricing lives teams-side: see MODEL_PRICES_PER_MILLION
             # and the /teams/{id}/costs endpoint.)
             try:
                 total = int(response.get("total_tokens", 0) or 0)
@@ -2323,7 +2323,7 @@ class AgentDaemon:
                     },
                 )
                 # Meter the team's daily spend (auto-pauses the team if over cap).
-                from swarm_server.budget import budget_tracker
+                from teams_server.budget import budget_tracker
                 budget_tracker.record_turn(
                     self.cfg.get("team_id", "default"), self._current_model,
                     turn_in, turn_out, turn_cache,

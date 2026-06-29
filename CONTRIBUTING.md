@@ -5,7 +5,7 @@ Thanks for your interest in Agent Teams.
 ## Dev setup
 
 ```bash
-git clone https://github.com/CyberTron957/hermes-mission-control agent-teams && cd agent-teams
+git clone https://github.com/CyberTron957/agent-teams agent-teams && cd agent-teams
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e . pytest
 ```

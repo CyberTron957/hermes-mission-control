@@ -24,7 +24,7 @@ def main():
         "PYTHONPATH": os.environ.get("HERMES_AGENT_PATH", os.path.expanduser("~/.hermes/hermes-agent"))
     }
     server_process = subprocess.Popen(
-        [sys.executable, "-u", "test_swarm.py"],
+        [sys.executable, "-u", "test_teams.py"],
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

@@ -14,7 +14,7 @@ restricted (neither is ``*``) a day matches if EITHER field matches; if only
 one is restricted that one applies. Times are evaluated in the server's local
 timezone, matching how the dashboard shows "now".
 
-Kept self-contained (no ``croniter`` dependency) so the swarm install stays
+Kept self-contained (no ``croniter`` dependency) so the teams install stays
 "batteries-included" and existing deployments need no extra pip step.
 """
 

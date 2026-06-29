@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for the 2026-06-12 run-analysis fixes (docs/swarm-run-analysis-
+"""Unit tests for the 2026-06-12 run-analysis fixes (docs/teams-run-analysis-
 20260612.md). No LLM, no Hermes.
 
 Covers:
@@ -29,11 +29,11 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import swarm_server.agent as agent_mod  # noqa: E402
-import swarm_server.tools as tools_mod  # noqa: E402
-from swarm_server.agent import AgentDaemon  # noqa: E402
-from swarm_server.monitoring import MonitoringDB  # noqa: E402
-from swarm_server.prompts import (  # noqa: E402
+import teams_server.agent as agent_mod  # noqa: E402
+import teams_server.tools as tools_mod  # noqa: E402
+from teams_server.agent import AgentDaemon  # noqa: E402
+from teams_server.monitoring import MonitoringDB  # noqa: E402
+from teams_server.prompts import (  # noqa: E402
     DIRECTIVE_HEARTBEAT_PROMPT,
     MISSING_RESULT_NUDGE,
     SWEEP_PAYLOAD_ELIDED_STUB,
@@ -252,7 +252,7 @@ def test_supervisor_and_truncated_empty_final():
 # ---------------------------------------------------------------------------
 
 def test_read_files_batch_and_missing(tmp_path, monkeypatch):
-    import swarm_server.config as cfg_mod
+    import teams_server.config as cfg_mod
     (tmp_path / "a.txt").write_text("alpha")
     (tmp_path / "b.txt").write_text("beta")
     monkeypatch.setattr(cfg_mod, "load_agents_config",

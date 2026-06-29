@@ -2,7 +2,7 @@
 
 # Agent Teams
 
-**Mission control for a self-hosted swarm of AI agents.**
+**Mission control for a self-hosted teams of AI agents.**
 
 A team of full [Hermes](https://github.com/NousResearch/hermes-agent) agents that
 browse, build, and publish - collaborating 24/7 on your own hardware - with one
@@ -17,7 +17,7 @@ real-time console to command them.
 ## Quick start
 
 > **Have an AI coding agent?** Paste one of these prompts into **Claude Code,
-> Codex, opencode, or Hermes itself** and it'll install and set up the whole swarm
+> Codex, opencode, or Hermes itself** and it'll install and set up the whole teams
 > for you — clone, dependencies, provider, and first run.
 
 <details>
@@ -26,7 +26,7 @@ real-time console to command them.
 ```text
 Install and run Agent Teams on this machine for me.
 
-Agent Teams (https://github.com/CyberTron957/hermes-mission-control) is a
+Agent Teams (https://github.com/CyberTron957/agent-teams) is a
 self-hosted multi-agent server with a real-time dashboard.
 
 1. Check Python 3.11+ (or Docker). If missing, tell me before installing system packages.
@@ -36,7 +36,7 @@ self-hosted multi-agent server with a real-time dashboard.
    Chromium download fails — everything else still works.)
 3. Check whether a provider is already configured — run `.venv/bin/agent-teams doctor`.
    If it already shows a model (e.g. an existing `~/.hermes` setup), ADOPT IT —
-   don't ask me for keys, the swarm reuses it automatically. Skip to step 5.
+   don't ask me for keys, the teams reuses it automatically. Skip to step 5.
 4. Only if NO provider is configured, ask me for:
      - provider (e.g. openai, anthropic, or "custom" for an OpenAI-compatible / proxy endpoint)
      - model name, API key, and base URL (base URL only for custom/proxy, e.g. http://localhost:4000/v1)
@@ -70,14 +70,14 @@ Keep my API key local — don't commit it or send it anywhere.
 ```text
 Deploy Agent Teams on this VPS, exposed safely over HTTPS.
 
-Agent Teams (https://github.com/CyberTron957/hermes-mission-control) is a
+Agent Teams (https://github.com/CyberTron957/agent-teams) is a
 self-hosted multi-agent server. Its agents can run terminal commands as the
 server user, so containment and auth matter. Please:
 
 1. Read docs/deploy-vps.md in the repo and follow its hardened path. Prefer the
    Docker route so the agents' terminal access stays contained.
 2. Clone the repo and bring it up with Docker Compose (restart: unless-stopped).
-3. Generate a strong SWARM_API_KEY and set it — it must guard every endpoint and
+3. Generate a strong TEAMS_API_KEY and set it — it must guard every endpoint and
    the WebSocket. Show it to me once and store it somewhere I can find it.
 4. Configure the LLM provider via `hermes setup` against the shared config —
    PAUSE and ask me for the provider + API key.
@@ -100,7 +100,7 @@ file that could be committed.
 **Or do it yourself — macOS & Linux, one line.** 
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/CyberTron957/hermes-mission-control/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/CyberTron957/agent-teams/main/install.sh)
 ```
 
 
@@ -109,14 +109,14 @@ bash <(curl -fsSL https://raw.githubusercontent.com/CyberTron957/hermes-mission-
 
 ```bash
 # Docker
-git clone https://github.com/CyberTron957/hermes-mission-control agent-teams && cd agent-teams
-docker compose run --rm swarm agent-teams setup  
+git clone https://github.com/CyberTron957/agent-teams agent-teams && cd agent-teams
+docker compose run --rm teams agent-teams setup  
 docker compose up --build
 ```
 or
 ```bash
 # From a clone 
-git clone https://github.com/CyberTron957/hermes-mission-control agent-teams && cd agent-teams
+git clone https://github.com/CyberTron957/agent-teams agent-teams && cd agent-teams
 bash install.sh
 ```
 
@@ -161,7 +161,7 @@ bash install.sh
   exponential backoff - work is paused, not lost, and retry budgets are spared.
 - A per-task retry budget that dead-letters tasks which keep failing, so nothing
   silently zombies.
-- A swarm-wide loop detector that catches A↔B ping-pong and team stalls and
+- A teams-wide loop detector that catches A↔B ping-pong and team stalls and
   injects a corrective nudge.
 - Automatic context compaction (Hermes' compressor, configured per agent) plus
   tool-output caps and stale-tool-result aging to keep context bounded.
@@ -186,7 +186,7 @@ bash install.sh
   tracking throughout.
 - A per-team **credentials** store on disk with `0600` permissions - referenced by
   name, never echoed back, with purpose validation to prevent prompt leakage.
-- A single `SWARM_API_KEY` that, when set, guards **every** HTTP endpoint *and* the
+- A single `TEAMS_API_KEY` that, when set, guards **every** HTTP endpoint *and* the
   live WebSocket; the dashboard prompts for it once.
 
 **Dashboard & observability**
@@ -209,10 +209,10 @@ bash install.sh
 - A \`agent-teams\` CLI (\`up\` foreground/detached, \`down\`, \`status\`, \`setup\`, \`set-model\`, \`init\`, \`doctor\`) where \`doctor\` pinpoints a bad
   install (Hermes, model, Chromium, compat seams).
 - A systemd unit example, stdout logs, and optional on-disk rotating logs
-  (`SWARM_LOG_FILE`).
+  (`TEAMS_LOG_FILE`).
 - Configure providers natively with `hermes setup` (40+ providers) **or** route the
-  whole swarm through one OpenAI-compatible / LiteLLM proxy (`SWARM_LLM_*`).
-- All state under `SWARM_DATA_DIR` with rotating config backups; built on Hermes,
+  whole teams through one OpenAI-compatible / LiteLLM proxy (`TEAMS_LLM_*`).
+- All state under `TEAMS_DATA_DIR` with rotating config backups; built on Hermes,
   which it tracks automatically via a compatibility self-check.
 
 ## Hosting on VPS? 

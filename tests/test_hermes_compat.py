@@ -1,13 +1,13 @@
 """Hermes compatibility self-check tests.
 
 These run against the REAL installed Hermes (the same venv the server uses), so a
-Hermes upgrade that moves an internal API the swarm depends on fails CI here —
+Hermes upgrade that moves an internal API the teams depends on fails CI here —
 the whole point of the self-check is to make that drift loud, not silent.
 """
 
 import pytest
 
-from swarm_server.hermes_compat import (
+from teams_server.hermes_compat import (
     run_self_check,
     log_self_check,
     CompatReport,
@@ -24,10 +24,10 @@ def test_self_check_runs_and_reports_version():
 
 
 def test_no_critical_seam_drift_against_installed_hermes():
-    """The internal Hermes APIs the swarm builds over must still hold.
+    """The internal Hermes APIs the teams builds over must still hold.
 
     If this fails after a `pip install -U hermes-agent`, a load-bearing seam
-    moved — reconcile swarm_server/hermes_compat.py (and the dependent feature)
+    moved — reconcile teams_server/hermes_compat.py (and the dependent feature)
     before shipping, rather than letting the feature silently no-op.
     """
     report = run_self_check()
@@ -58,7 +58,7 @@ def test_disabled_toolsets_have_no_stale_entries():
     # Every name in DISABLED_TOOLSETS must exist in Hermes' live registry, else
     # it's a dead no-op that silently stops disabling anything.
     from toolsets import get_all_toolsets
-    from swarm_server.config import DISABLED_TOOLSETS
+    from teams_server.config import DISABLED_TOOLSETS
 
     known = set(get_all_toolsets().keys())
     stale = [t for t in DISABLED_TOOLSETS if t not in known]

@@ -11,11 +11,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import swarm_server.cli as cli          # noqa: E402
+import teams_server.cli as cli          # noqa: E402
 
 
 def _point_pidfile(monkeypatch, tmp_path):
-    pf = tmp_path / "swarm.pid"
+    pf = tmp_path / "teams.pid"
     monkeypatch.setattr(cli, "_pidfile_path", lambda: pf)
     return pf
 
@@ -129,7 +129,7 @@ def test_detach_is_noop_when_already_running(monkeypatch, capsys):
 
 # ---- setup -------------------------------------------------------------------
 def test_setup_invokes_hermes_against_shared_home(monkeypatch, tmp_path, capsys):
-    import swarm_server.model_config as mc
+    import teams_server.model_config as mc
     monkeypatch.setattr(mc, "SHARED_HERMES_HOME", tmp_path / ".hermes-shared")
     calls = {}
 

@@ -20,9 +20,9 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import swarm_server.config as cfg_mod  # noqa: E402
-from swarm_server.config import add_agent_cron, record_cron_fire  # noqa: E402
-from swarm_server.monitoring import MonitoringDB  # noqa: E402
+import teams_server.config as cfg_mod  # noqa: E402
+from teams_server.config import add_agent_cron, record_cron_fire  # noqa: E402
+from teams_server.monitoring import MonitoringDB  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

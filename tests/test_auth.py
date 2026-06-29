@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Tests for the optional single-key auth (SWARM_API_KEY).
+"""Tests for the optional single-key auth (TEAMS_API_KEY).
 
 Covers the HTTP middleware (all methods guarded, exempt allow-list, both header
 forms, constant-time path), the /auth/check probe, and the WebSocket
 first-message auth. Auth-disabled behaviour must be byte-identical to before.
 
 Uses FastAPI TestClient; no LLM, no Hermes (server import keeps Hermes lazy).
-The auth code reads the SERVER MODULE global SWARM_API_KEY, so a single
+The auth code reads the SERVER MODULE global TEAMS_API_KEY, so a single
 monkeypatch on server_mod flips every code path.
 
 Run:  pytest tests/test_auth.py -v
@@ -23,7 +23,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from fastapi.testclient import TestClient  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
-import swarm_server.server as server_mod  # noqa: E402
+import teams_server.server as server_mod  # noqa: E402
 
 KEY = "sekrit-key-123"
 
@@ -37,13 +37,13 @@ def client():
 
 @pytest.fixture()
 def auth_on(monkeypatch):
-    monkeypatch.setattr(server_mod, "SWARM_API_KEY", KEY)
+    monkeypatch.setattr(server_mod, "TEAMS_API_KEY", KEY)
     return KEY
 
 
 @pytest.fixture()
 def auth_off(monkeypatch):
-    monkeypatch.setattr(server_mod, "SWARM_API_KEY", "")
+    monkeypatch.setattr(server_mod, "TEAMS_API_KEY", "")
     return ""
 
 

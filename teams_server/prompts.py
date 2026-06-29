@@ -1,4 +1,4 @@
-"""Single home for all swarm prompt/soul construction.
+"""Single home for all teams prompt/soul construction.
 
 Everything that builds the text an agent sees lives here: the shared SOUL prose
 (``COMMON_SOUL_TEMPLATE``), the per-agent identity / soul / live-context
@@ -6,7 +6,7 @@ composers, the small builders they use (org chart, project tree, recent peer
 messages, cron summary), and the task-injection prompt constants (heartbeat,
 cron wake-up, supervisor review) plus the default supervisor soul.
 
-Layering: this module depends on ``swarm_server.config`` for a few path/config
+Layering: this module depends on ``teams_server.config`` for a few path/config
 helpers (``_get_project_dir``, ``_get_team_workspace_path``,
 ``SWEEP_INTERVAL_SECONDS``) — a one-way edge. ``config`` does NOT import this
 module at top level (its lone use of ``SUPERVISOR_DEFAULT_SOUL`` is a
@@ -23,7 +23,7 @@ diagram / member list).
 import json
 from typing import Any, Dict, List, Optional
 
-from swarm_server.config import (
+from teams_server.config import (
     LIVE_CTX_COMPLETED,
     LIVE_CTX_DECISIONS,
     LIVE_CTX_PEER_MESSAGES,
@@ -34,9 +34,9 @@ from swarm_server.config import (
 )
 
 COMMON_SOUL_TEMPLATE = """
-# Swarm Agent Operating Manual
+# Teams Agent Operating Manual
 
-You are **{agent_name}** on team "{team_id}" in an autonomous multi-agent swarm.
+You are **{agent_name}** on team "{team_id}" in an autonomous multi-agent teams.
 Three layers define you, in priority order when they conflict:
 1. SAFETY (below) — absolute.
 2. THE MISSION — the PROJECT BRIEF (workspace.md) shown in LIVE TEAM CONTEXT,
@@ -44,7 +44,7 @@ Three layers define you, in priority order when they conflict:
    "progress" means. This manual never overrides it.
 3. YOUR ROLE (your identity block) — your lane within the mission.
 
-You run in an async batch loop: the swarm wakes you with queued messages
+You run in an async batch loop: the teams wakes you with queued messages
 (typically within ~{sweep_interval}s of them being sent), you take one turn, you
 go idle. Idle is a normal, correct, FREE state — you are never shut down, and
 you are re-woken on new messages, your scheduled wake-ups, or an idle heartbeat.
@@ -70,7 +70,7 @@ turn and the current block disagree, the current block is right.
 4. **Advance the mission in your lane.** Take the next concrete, role-fitting
    step from the brief — or delegate it to the right peer if it's not your lane.
    Lane-jumping ("I'll just do their part real quick") duplicates work and is
-   the most common drift in this swarm.
+   the most common drift in this teams.
 5. **Nothing concrete left? Stop.** End the turn with no tool call. Never invent
    busywork, never re-verify settled facts, never message a peer just to have
    output.
@@ -132,7 +132,7 @@ it looks.
 - **Prove capability FIRST.** If a deliverable's final step needs an unproven
   ability (an SMTP send, a logged-in account, a payment method), prove it with
   ONE cheap REAL test before building toward it. If it's missing → escalate now
-  and switch tasks. Preparing 10 files to send 0 emails is this swarm's most
+  and switch tasks. Preparing 10 files to send 0 emails is this teams's most
   expensive recorded failure — never build toward an action you cannot execute.
 - **Real actions need real inputs.** Never fire a real action on guessed or
   unverified data (e.g. a guessed email address, a placeholder id). Verify the
@@ -511,7 +511,7 @@ def compose_soul_identity(agent_cfg: Dict[str, Any]) -> str:
     This becomes the agent's PRIMARY identity, written to {HERMES_HOME}/SOUL.md
     so Hermes loads it as the lead block of the (cached) system prompt — instead
     of the generic auto-seeded "You are Hermes Agent…" template. The richer
-    operational framing (swarm rules, org chart, peers) stays in the ephemeral
+    operational framing (teams rules, org chart, peers) stays in the ephemeral
     prompt via compose_agent_soul(..., include_role=False); the role lives here
     so it is the first thing the model reads and is cache-stable across turns.
     """
@@ -522,7 +522,7 @@ def compose_soul_identity(agent_cfg: Dict[str, Any]) -> str:
     return (
         f"{role}\n\n"
         f'You are "{agent_id}" ({agent_name}), one agent on the "{team_id}" team in an '
-        f"autonomous multi-agent swarm. Operate strictly in the role described above."
+        f"autonomous multi-agent teams. Operate strictly in the role described above."
     )
 
 
@@ -584,7 +584,7 @@ def _recent_peer_messages(team_id: str, full_config: Optional[Dict[str, Any]], l
     """Render the last N send_peer_message events across the team, oldest→newest,
     so every agent has shared awareness of recent team chatter."""
     try:
-        from swarm_server.monitoring import monitor_db
+        from teams_server.monitoring import monitor_db
         # message_sent events aren't team-tagged, so scope by the team's agent set.
         team_agents = set()
         if full_config:
@@ -650,7 +650,7 @@ def _open_delegations_block(team_id: str, agent_id: str) -> str:
     Each item carries its age; items older than 2h are flagged so a stuck
     delegation is visibly stuck instead of silently rotting in the list."""
     try:
-        from swarm_server.monitoring import monitor_db
+        from teams_server.monitoring import monitor_db
         owe = monitor_db.get_open_delegations(to_agent=agent_id, team_id=team_id, limit=20)
         awaiting = monitor_db.get_open_delegations(from_agent=agent_id, team_id=team_id, limit=20)
         if not owe and not awaiting:
@@ -692,7 +692,7 @@ def _recently_completed_block(team_id: str, limit: int = 8) -> str:
     same work was already delivered and by whom. (Observed failure without it: a
     coordinator re-delegated an already-delivered prospect list three times.)"""
     try:
-        from swarm_server.monitoring import monitor_db
+        from teams_server.monitoring import monitor_db
         rows = monitor_db.get_recent_closed_delegations(team_id=team_id, limit=limit)
         if not rows:
             return "(none yet.)"
@@ -717,7 +717,7 @@ def _waiting_on_human_block(team_id: str, full_config: Optional[Dict[str, Any]])
     credential ask sat unanswered). Surfacing the pending asks to the whole
     team lets everyone route around the blocked path instead of into it."""
     try:
-        from swarm_server.tools import get_pending_questions
+        from teams_server.tools import get_pending_questions
         team_agents = None
         if full_config:
             team_agents = {
@@ -757,7 +757,7 @@ def _build_cron_summary(full_config: Optional[Dict[str, Any]], agent_id: str) ->
     if not crons:
         return "(none — you have no scheduled wake-ups)"
     try:
-        from swarm_server.cron import cron_describe
+        from teams_server.cron import cron_describe
     except Exception:
         cron_describe = lambda s: s  # noqa: E731
     lines = []
@@ -780,7 +780,7 @@ def _recent_decisions(team_id: str, limit: int = 20) -> str:
     one-liners via the log_decision tool and read them back here every turn, so
     the team stays coordinated without anyone opening a file."""
     try:
-        from swarm_server.monitoring import monitor_db
+        from teams_server.monitoring import monitor_db
         rows = monitor_db.get_recent_decisions(team_id, limit=limit)  # newest first
         out = []
         # Older decisions are rolled up into a milestone so long-term memory isn't
@@ -1074,7 +1074,7 @@ def compose_agent_soul(
 
     # Context-isolated agents (e.g. a black-box QA tester) deliberately get NO
     # product brief, roadmap, or org chart — they must discover the product fresh,
-    # as an outside customer would. They keep only the swarm mechanics + their role
+    # as an outside customer would. They keep only the teams mechanics + their role
     # + the bare list of peers to report findings to.
     isolated = bool(agent_cfg.get("context_isolated"))
 

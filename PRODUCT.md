@@ -6,7 +6,7 @@ product
 
 ## Users
 
-Self-hosters and AI tinkerers running a 24/7 multi-agent swarm on their own
+Self-hosters and AI tinkerers running a 24/7 multi-agent teams on their own
 hardware. They are technical (comfortable with Docker, API keys, terminals)
 and use the dashboard as an operations console: watching agents think and call
 tools in real time, steering the team, approving config changes, and answering
@@ -16,12 +16,12 @@ distance and trustworthy at 3am.
 
 ## Product Purpose
 
-Agent Teams is a self-hostable multi-agent swarm server with a real-time
+Agent Teams is a self-hostable multi-agent teams server with a real-time
 dashboard. Each agent is a full Hermes agent (web browsing, terminal, files,
 publishing); agents collaborate peer-to-peer on shared projects. The dashboard
 is the single pane of glass for the whole team: live execution view, per-agent
 configuration, telemetry, and a human-in-the-loop inbox. Success looks like an
-operator who can understand swarm state in seconds and intervene with
+operator who can understand teams state in seconds and intervene with
 confidence.
 
 ## Brand Personality
@@ -44,7 +44,7 @@ Three words: precise, calm, alive.
 
 ## Design Principles
 
-1. **State at a glance** — the operator should read swarm health (who's idle,
+1. **State at a glance** — the operator should read teams health (who's idle,
    busy, blocked on a human) in under three seconds, from across the room.
 2. **Live, not noisy** — real-time data earns subtle motion (pulses, streams),
    never attention-grabbing animation; the UI breathes, it doesn't flash.
