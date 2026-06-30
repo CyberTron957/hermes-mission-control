@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-teams"
-version = "0.4.2"
+version = "0.5.0"
 description = "P2P multi-agent teams server with a real-time dashboard, powered by the Hermes agent."
 readme = "README.md"
 requires-python = ">=3.11"
